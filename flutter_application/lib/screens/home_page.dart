@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'recipe_page.dart';
 import 'shopping_list_page.dart';
-import 'fridge.page.dart';
-import 'settings_page.dart'; // SettingsPage'i import ediyoruz
+import 'settings_page.dart'; 
+import '/services/gemini_service.dart';
+import 'gemini_response_page.dart';
+import 'dart:io';
+
+
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -78,12 +82,32 @@ class HomePageState extends State<HomePage> {
                     iconSize: 90,
                     color: const Color.fromARGB(255, 255, 255, 255),
                     textColor: Colors.black,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const FridgePage()),
+                    onPressed: () async {
+                    String imagePath = "/Users/burcugul/FridgeGenious/test_image.jpg"; // Replace with your actual image path
+                    File imageFile = File(imagePath);
+
+                    if (!imageFile.existsSync()) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("Image not found: $imagePath")),
                       );
-                    },
+                      return;
+                    }
+
+                    GeminiService geminiService = GeminiService();
+                    String aiResponse = await geminiService.analyzeImage(imageFile);
+
+
+                    // Log the response here for debugging
+                    print("AI Response: $aiResponse");
+
+                    // Pass the response to GeminiResponsePage
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => GeminiResponsePage(response: aiResponse),
+                      ),
+                    );
+                  },
                   ),
                   const SizedBox(height: 70),
                   _buildCustomButton(
