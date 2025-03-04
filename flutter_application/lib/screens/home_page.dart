@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application/screens/fridge_page.dart';
 import 'recipe_page.dart';
 import 'shopping_list_page.dart';
-import 'settings_page.dart'; 
-import '/services/gemini_service.dart';
-import 'gemini_response_page.dart';
+import 'settings_page.dart';
+import '../services/gemini_image_service.dart';
 import 'dart:io';
-
-
+import '../services/food_database_service.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -83,31 +82,38 @@ class HomePageState extends State<HomePage> {
                     color: const Color.fromARGB(255, 255, 255, 255),
                     textColor: Colors.black,
                     onPressed: () async {
-                    String imagePath = "/Users/burcugul/FridgeGenious/test_image.jpg"; // Replace with your actual image path
-                    File imageFile = File(imagePath);
+                      String imagePath =
+                          "/Users/burcugul/FridgeGenious/test_image.jpg"; // Replace with your actual image path
+                      File imageFile = File(imagePath);
 
-                    if (!imageFile.existsSync()) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("Image not found: $imagePath")),
+                      if (!imageFile.existsSync()) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                              content: Text("Image not found: $imagePath")),
+                        );
+                        return;
+                      }
+
+                      GeminiService geminiService = GeminiService();
+                      String aiResponse =
+                          await geminiService.analyzeImage(imageFile);
+
+                      // Log the response here for debugging
+                      print("AI Response: $aiResponse");
+                      WidgetsFlutterBinding.ensureInitialized();
+
+                      // Initialize the SQLite database
+                      final db = await FoodDatabaseService().initDatabase();
+                      print("Database path: ${db.path}");
+
+                      // Pass the response to GeminiResponsePage
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => FridgePage(),
+                        ),
                       );
-                      return;
-                    }
-
-                    GeminiService geminiService = GeminiService();
-                    String aiResponse = await geminiService.analyzeImage(imageFile);
-
-
-                    // Log the response here for debugging
-                    print("AI Response: $aiResponse");
-
-                    // Pass the response to GeminiResponsePage
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => GeminiResponsePage(response: aiResponse),
-                      ),
-                    );
-                  },
+                    },
                   ),
                   const SizedBox(height: 70),
                   _buildCustomButton(
@@ -119,7 +125,8 @@ class HomePageState extends State<HomePage> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const RecipePage()),
+                        MaterialPageRoute(
+                            builder: (context) => const RecipePage()),
                       );
                     },
                   ),
@@ -133,7 +140,8 @@ class HomePageState extends State<HomePage> {
                     onPressed: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => const ShoppingListPage()),
+                        MaterialPageRoute(
+                            builder: (context) => const ShoppingListPage()),
                       );
                     },
                   ),
@@ -171,10 +179,12 @@ class HomePageState extends State<HomePage> {
                 });
 
                 // Sayfa geçişi
-                if (index == 2) { // Settings Page
+                if (index == 2) {
+                  // Settings Page
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => const SettingsPage()),
+                    MaterialPageRoute(
+                        builder: (context) => const SettingsPage()),
                   );
                 }
               },
