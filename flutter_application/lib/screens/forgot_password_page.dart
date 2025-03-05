@@ -15,7 +15,7 @@ class ForgotPasswordPage extends StatelessWidget {
           onPressed: () {
             Navigator.pop(context); // Go back to the previous page
           },
-        )
+        ),
       ),
       body: Stack(
         children: [

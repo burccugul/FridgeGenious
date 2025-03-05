@@ -6,14 +6,17 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Fridge Genious',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        brightness: Brightness.dark,
       ),
-      home: const FridgePage(),
+      home: const OnboardingPage(),
     );
   }
 }
