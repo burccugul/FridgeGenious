@@ -9,7 +9,7 @@ class GeminiResponsePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Fetch food items from the database
-    Future<List<String>> _fetchFoodItems() async {
+    Future<List<String>> fetchFoodItems() async {
       return await FoodDatabaseService().getAllFood();
     }
 
@@ -34,7 +34,7 @@ class GeminiResponsePage extends StatelessWidget {
               const SizedBox(height: 10),
               // Display the food items from the database
               FutureBuilder<List<String>>(
-                future: _fetchFoodItems(),
+                future: fetchFoodItems(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());

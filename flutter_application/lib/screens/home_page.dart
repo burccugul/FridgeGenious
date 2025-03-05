@@ -6,6 +6,7 @@ import 'settings_page.dart';
 import '../services/gemini_image_service.dart';
 import 'dart:io';
 import '../services/food_database_service.dart';
+import 'dart:developer' as developer;
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -99,13 +100,14 @@ class HomePageState extends State<HomePage> {
                           await geminiService.analyzeImage(imageFile);
 
                       // Log the response here for debugging
-                      print("AI Response: $aiResponse");
+                      developer.log("AI Response: $aiResponse");
                       WidgetsFlutterBinding.ensureInitialized();
 
                       // Initialize the SQLite database
                       final db = await FoodDatabaseService().initDatabase();
-                      print("Database path: ${db.path}");
+                      developer.log("Database path: ${db.path}");
 
+                      if (!context.mounted) return;
                       // Pass the response to GeminiResponsePage
                       Navigator.push(
                         context,

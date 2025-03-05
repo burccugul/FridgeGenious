@@ -25,9 +25,8 @@ class GeminiRecipeService {
     }
 
     // Create the prompt for the Gemini model
-    String prompt = "Generate a recipe using the following ingredients: " +
-        ingredients.join(', ') +
-        ". The recipe should include the ingredients and detailed steps.";
+    String prompt = "Generate a recipe using the following ingredients: "
+        "${ingredients.join(', ')}. The recipe should include the ingredients and detailed steps.";
 
     try {
       // Generate the recipe using Gemini

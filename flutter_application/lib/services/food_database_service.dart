@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart';
+import 'dart:developer' as developer;
 
 class FoodDatabaseService {
   static final FoodDatabaseService _instance = FoodDatabaseService._internal();
@@ -20,7 +21,7 @@ class FoodDatabaseService {
     final directory = await getApplicationDocumentsDirectory();
     String path = join(directory.path, 'food_database.db'); // Custom path
 
-    print("Database path: $path");
+    developer.log("Database path: $path");
 
     // Open or create the database
     _database = await openDatabase(path, version: 1, onCreate: (db, version) {
