@@ -1,11 +1,16 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_application/screens/fridge_page.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:image_picker/image_picker.dart';
 import 'recipe_page.dart';
 import 'shopping_list_page.dart';
+import 'fridge.page.dart';
 import 'settings_page.dart';
-import '../services/gemini_image_service.dart';
-import 'dart:io';
-import '../services/food_database_service.dart';
+import 'image_preview_page.dart';
+
+// ✅ Gemini API Key'in:
+const String geminiApiKey = 'AIzaSyBu12BW-XfmHaTcf_giQnPKTn2Bdb7-HkE';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,6 +21,8 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   int _currentIndex = 0;
+  final ImagePicker _picker = ImagePicker();
+  XFile? _selectedImage;
 
   final List<IconData> _icons = [
     Icons.home,
@@ -23,16 +30,59 @@ class HomePageState extends State<HomePage> {
     Icons.settings,
   ];
 
+  Future<void> pickImageAndSend() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+
+    if (image != null) {
+      setState(() {
+        _selectedImage = image;
+      });
+      print('Seçilen resim: ${image.path}');
+
+      // ✅ Gemini'ye gönder:
+      await sendImageToGemini(File(image.path));
+
+      // ✅ Seçilen resmi göster:
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ImagePreviewPage(imagePath: image.path),
+        ),
+      );
+    } else {
+      print('Hiçbir resim seçilmedi.');
+    }
+  }
+
+  Future<void> sendImageToGemini(File imageFile) async {
+    final model = GenerativeModel(
+      model: 'gemini-1.5-flash',
+      apiKey: geminiApiKey,
+    );
+
+    final imageBytes = await imageFile.readAsBytes();
+    final prompt = 'Bu görselde kaç tane yiyecek var, sayar mısın?';
+
+    try {
+      final response = await model.generateContent([
+        Content.multi([
+          TextPart(prompt),
+          DataPart('image/jpeg', imageBytes),
+        ])
+      ]);
+
+      print('✅ Gemini Yanıtı: ${response.text}');
+    } catch (e) {
+      print('❌ Gemini Hatası: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          // Yellow background
-          Container(
-            color: const Color(0xFFFFB74D),
-          ),
-          // White curved section
+          Container(color: const Color(0xFFFFB74D)),
           Positioned(
             bottom: 0,
             left: 0,
@@ -43,35 +93,28 @@ class HomePageState extends State<HomePage> {
               child: Container(),
             ),
           ),
-          // Main content
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 20),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Hey, Admin',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
+                  Text(
+                    'Hey, Admin',
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontStyle: FontStyle.italic,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Let’s manage your fridge!',
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Colors.black54,
-                      ),
+                  Text(
+                    'Let’s manage your fridge!',
+                    style: TextStyle(
+                      fontSize: 20,
+                      color: Colors.black54,
                     ),
                   ),
                   const SizedBox(height: 40),
@@ -79,39 +122,13 @@ class HomePageState extends State<HomePage> {
                     text: "What's Inside My Fridge",
                     icon: Icons.kitchen,
                     iconSize: 90,
-                    color: const Color.fromARGB(255, 255, 255, 255),
+                    color: Colors.white,
                     textColor: Colors.black,
-                    onPressed: () async {
-                      String imagePath =
-                          "/Users/burcugul/FridgeGenious/test_image.jpg"; // Replace with your actual image path
-                      File imageFile = File(imagePath);
-
-                      if (!imageFile.existsSync()) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text("Image not found: $imagePath")),
-                        );
-                        return;
-                      }
-
-                      GeminiService geminiService = GeminiService();
-                      String aiResponse =
-                          await geminiService.analyzeImage(imageFile);
-
-                      // Log the response here for debugging
-                      print("AI Response: $aiResponse");
-                      WidgetsFlutterBinding.ensureInitialized();
-
-                      // Initialize the SQLite database
-                      final db = await FoodDatabaseService().initDatabase();
-                      print("Database path: ${db.path}");
-
-                      // Pass the response to GeminiResponsePage
+                    onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => FridgePage(),
-                        ),
+                            builder: (context) => const FridgePage()),
                       );
                     },
                   ),
@@ -120,7 +137,7 @@ class HomePageState extends State<HomePage> {
                     text: "Suggest Recipe",
                     icon: Icons.book,
                     iconSize: 40,
-                    iconColor: const Color.fromARGB(255, 0, 0, 0),
+                    iconColor: Colors.black,
                     color: const Color.fromARGB(255, 241, 147, 7),
                     onPressed: () {
                       Navigator.push(
@@ -135,7 +152,7 @@ class HomePageState extends State<HomePage> {
                     text: "Suggest Shopping List",
                     icon: Icons.shopping_cart,
                     iconSize: 40,
-                    iconColor: const Color.fromARGB(255, 0, 0, 0),
+                    iconColor: Colors.black,
                     color: const Color.fromARGB(255, 241, 147, 7),
                     onPressed: () {
                       Navigator.push(
@@ -178,9 +195,9 @@ class HomePageState extends State<HomePage> {
                   _currentIndex = index;
                 });
 
-                // Sayfa geçişi
-                if (index == 2) {
-                  // Settings Page
+                if (index == 1) {
+                  pickImageAndSend();
+                } else if (index == 2) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -190,19 +207,19 @@ class HomePageState extends State<HomePage> {
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
                 width: _currentIndex == index ? 60 : 50,
                 height: _currentIndex == index ? 60 : 50,
                 decoration: BoxDecoration(
                   color: _currentIndex == index
-                      ? const Color.fromARGB(255, 255, 230, 149)
+                      ? const Color(0xFFFFE695)
                       : Colors.grey[300],
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   _icons[index],
                   size: _currentIndex == index ? 30 : 24,
-                  color: _currentIndex == index ? Colors.white : Colors.black54,
+                  color:
+                      _currentIndex == index ? Colors.white : Colors.black54,
                 ),
               ),
             );
@@ -231,15 +248,8 @@ class HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.circular(30),
         ),
       ),
-      icon: Icon(
-        icon,
-        size: iconSize,
-        color: iconColor,
-      ),
-      label: Text(
-        text,
-        style: TextStyle(fontSize: 18, color: textColor),
-      ),
+      icon: Icon(icon, size: iconSize, color: iconColor),
+      label: Text(text, style: TextStyle(fontSize: 18, color: textColor)),
     );
   }
 }
@@ -254,11 +264,7 @@ class CurvedPainter extends CustomPainter {
     var path = Path();
     path.moveTo(0, size.height * 0.2);
     path.quadraticBezierTo(
-      size.width * 0.25,
-      size.height * 0.05,
-      size.width,
-      size.height * 0.15,
-    );
+        size.width * 0.25, size.height * 0.05, size.width, size.height * 0.15);
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
     path.close();

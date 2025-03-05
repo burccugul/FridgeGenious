@@ -45,5 +45,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Camera and Photo Library Access Permissions -->
+	<key>NSCameraUsageDescription</key>
+	<string>Fotoğraf çekmek için kameraya erişim gerekiyor.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Galeriden resim seçmek için izin gerekiyor.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Galerideki resimlere ekleme yapmak için izin gerekiyor.</string>
 </dict>
 </plist>

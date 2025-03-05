@@ -23,16 +23,10 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       appBar: AppBar(
-      backgroundColor: Colors.white, // White background
-      iconTheme: const IconThemeData(color: Colors.black), // Black icons
-      title: const Text(
-        'Settings',
-        style: TextStyle(color: Colors.black), // Black text
+        title: const Text('Settings'),
+        elevation: 0,
       ),
-      elevation: 0,
-    ),
       body: ListView(
         children: [
           // Profile Settings Section
@@ -40,39 +34,21 @@ class _SettingsPageState extends State<SettingsPage> {
             'Profile Settings',
             [
               ListTile(
-                title: const Text(
-                  'Name',
-                  style: TextStyle(color: Colors.black),
-                ),
-                subtitle: const Text(
-                  'Sude Sarı',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Name'),
+                subtitle: const Text('Sude Sarı'),
                 trailing: TextButton(
                   onPressed: () {
                     // Implement name edit functionality
                   },
-                  child: const Text(
-                    'Edit',
-                    style: TextStyle(color: Colors.black),
-                  ),
+                  child: const Text('Edit'),
                 ),
               ),
               const ListTile(
-                title: Text(
-                  'Email',
-                  style: TextStyle(color: Colors.black),
-                ),
-                subtitle: Text(
-                  'sude.sari@tedu.edu.tr',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: Text('Email'),
+                subtitle: Text('sude.sari@tedu.edu.tr'),
               ),
               ListTile(
-                title: const Text(
-                  'Change Password',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Change Password'),
                 onTap: () {
                   // Implement password change functionality
                 },
@@ -86,30 +62,21 @@ class _SettingsPageState extends State<SettingsPage> {
             'Preferences',
             [
               ListTile(
-                title: const Text(
-                  'Dietary Preferences',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Dietary Preferences'),
                 trailing: const Icon(Icons.arrow_forward_ios),
                 onTap: () {
                   // Implement dietary preferences screen
                 },
               ),
               ListTile(
-                title: const Text(
-                  'Allergens',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Allergens'),
                 trailing: const Icon(Icons.arrow_forward_ios),
                 onTap: () {
                   // Implement allergens screen
                 },
               ),
               ListTile(
-                title: const Text(
-                  'Favorite Ingredients',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Favorite Ingredients'),
                 trailing: const Icon(Icons.arrow_forward_ios),
                 onTap: () {
                   // Implement favorite ingredients screen
@@ -123,10 +90,7 @@ class _SettingsPageState extends State<SettingsPage> {
             'Notifications',
             [
               SwitchListTile(
-                title: const Text(
-                  'Expiring Items',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Expiring Items'),
                 value: expiringItemsNotification,
                 onChanged: (bool value) {
                   setState(() {
@@ -135,10 +99,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 },
               ),
               SwitchListTile(
-                title: const Text(
-                  'Recipe Suggestions',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Recipe Suggestions'),
                 value: recipeNotification,
                 onChanged: (bool value) {
                   setState(() {
@@ -147,10 +108,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 },
               ),
               SwitchListTile(
-                title: const Text(
-                  'Low-stock Items',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Low-stock Items'),
                 value: lowStockNotification,
                 onChanged: (bool value) {
                   setState(() {
@@ -166,27 +124,12 @@ class _SettingsPageState extends State<SettingsPage> {
             'Language',
             [
               ListTile(
-                title: const Text(
-                  'Language',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Language'),
                 trailing: DropdownButton<String>(
                   value: selectedLanguage,
                   items: const [
-                    DropdownMenuItem(
-                      value: 'English',
-                      child: Text(
-                        'English',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Turkish',
-                      child: Text(
-                        'Turkish',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    ),
+                    DropdownMenuItem(value: 'English', child: Text('English')),
+                    DropdownMenuItem(value: 'Turkish', child: Text('Turkish')),
                   ],
                   onChanged: (String? value) {
                     if (value != null) {
@@ -205,27 +148,12 @@ class _SettingsPageState extends State<SettingsPage> {
             'Data Management',
             [
               ListTile(
-                title: const Text(
-                  'Sync with Cloud',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Sync with Cloud'),
                 trailing: DropdownButton<String>(
                   value: syncMode,
                   items: const [
-                    DropdownMenuItem(
-                      value: 'Manual',
-                      child: Text(
-                        'Manual',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    ),
-                    DropdownMenuItem(
-                      value: 'Auto',
-                      child: Text(
-                        'Auto',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    ),
+                    DropdownMenuItem(value: 'Manual', child: Text('Manual')),
+                    DropdownMenuItem(value: 'Auto', child: Text('Auto')),
                   ],
                   onChanged: (String? value) {
                     if (value != null) {
@@ -237,20 +165,14 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
               ListTile(
-                title: const Text(
-                  'Export Data',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Export Data'),
                 onTap: () {
                   // Implement export functionality
                 },
                 trailing: const Icon(Icons.arrow_forward_ios),
               ),
               ListTile(
-                title: const Text(
-                  'Clear Local Data',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Clear Local Data'),
                 onTap: () {
                   _showClearDataDialog();
                 },
@@ -264,10 +186,7 @@ class _SettingsPageState extends State<SettingsPage> {
             'Theme & Display',
             [
               SwitchListTile(
-                title: const Text(
-                  'Dark Mode',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Dark Mode'),
                 value: isDarkMode,
                 onChanged: (bool value) {
                   setState(() {
@@ -276,33 +195,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 },
               ),
               ListTile(
-                title: const Text(
-                  'Text Size',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Text Size'),
                 trailing: SegmentedButton<TextSize>(
                   segments: const [
-                    ButtonSegment(
-                      value: TextSize.small,
-                      label: Text(
-                        'S',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    ),
-                    ButtonSegment(
-                      value: TextSize.medium,
-                      label: Text(
-                        'M',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    ),
-                    ButtonSegment(
-                      value: TextSize.large,
-                      label: Text(
-                        'L',
-                        style: TextStyle(color: Colors.black),
-                      ),
-                    ),
+                    ButtonSegment(value: TextSize.small, label: Text('S')),
+                    ButtonSegment(value: TextSize.medium, label: Text('M')),
+                    ButtonSegment(value: TextSize.large, label: Text('L')),
                   ],
                   selected: {selectedTextSize},
                   onSelectionChanged: (Set<TextSize> selection) {
@@ -320,20 +218,14 @@ class _SettingsPageState extends State<SettingsPage> {
             'Account Management',
             [
               ListTile(
-                title: const Text(
-                  'Logout',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Logout'),
                 onTap: () {
                   _showLogoutDialog();
                 },
                 trailing: const Icon(Icons.logout),
               ),
               ListTile(
-                title: const Text(
-                  'Delete My Account',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Delete My Account'),
                 onTap: () {
                   _showDeleteAccountDialog();
                 },
@@ -347,30 +239,18 @@ class _SettingsPageState extends State<SettingsPage> {
             'About & Support',
             [
               const ListTile(
-                title: Text(
-                  'Version',
-                  style: TextStyle(color: Colors.black),
-                ),
-                trailing: Text(
-                  '1.0.0',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: Text('Version'),
+                trailing: Text('1.0.0'),
               ),
               ListTile(
-                title: const Text(
-                  'Privacy Policy',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Privacy Policy'),
                 onTap: () {
                   // Implement privacy policy screen
                 },
                 trailing: const Icon(Icons.arrow_forward_ios),
               ),
               ListTile(
-                title: const Text(
-                  'Contact Support',
-                  style: TextStyle(color: Colors.black),
-                ),
+                title: const Text('Contact Support'),
                 onTap: () {
                   // Implement contact support functionality
                 },
@@ -394,7 +274,6 @@ class _SettingsPageState extends State<SettingsPage> {
             style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.black,
             ),
           ),
         ),
@@ -410,31 +289,19 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text(
-            'Clear Local Data',
-            style: TextStyle(color: Colors.black),
-          ),
-          content: const Text(
-            'Are you sure you want to clear all local data? This action cannot be undone.',
-            style: TextStyle(color: Colors.black),
-          ),
+          title: const Text('Clear Local Data'),
+          content: const Text('Are you sure you want to clear all local data? This action cannot be undone.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.black),
-              ),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () {
                 // Implement clear data functionality
                 Navigator.pop(context);
               },
-              child: const Text(
-                'Clear',
-                style: TextStyle(color: Colors.black),
-              ),
+              child: const Text('Clear'),
             ),
           ],
         );
@@ -447,31 +314,19 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text(
-            'Logout',
-            style: TextStyle(color: Colors.black),
-          ),
-          content: const Text(
-            'Are you sure you want to logout?',
-            style: TextStyle(color: Colors.black),
-          ),
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.black),
-              ),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () {
                 // Implement logout functionality
                 Navigator.pop(context);
               },
-              child: const Text(
-                'Logout',
-                style: TextStyle(color: Colors.black),
-              ),
+              child: const Text('Logout'),
             ),
           ],
         );
@@ -484,31 +339,19 @@ class _SettingsPageState extends State<SettingsPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text(
-            'Delete Account',
-            style: TextStyle(color: Colors.black),
-          ),
-          content: const Text(
-            'Are you sure you want to delete your account? This action cannot be undone.',
-            style: TextStyle(color: Colors.black),
-          ),
+          title: const Text('Delete Account'),
+          content: const Text('Are you sure you want to delete your account? This action cannot be undone.'),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Cancel',
-                style: TextStyle(color: Colors.black),
-              ),
+              child: const Text('Cancel'),
             ),
             TextButton(
               onPressed: () {
                 // Implement account deletion functionality
                 Navigator.pop(context);
               },
-              child: const Text(
-                'Delete',
-                style: TextStyle(color: Colors.black),
-              ),
+              child: const Text('Delete'),
             ),
           ],
         );
