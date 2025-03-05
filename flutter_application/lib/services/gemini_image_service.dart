@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'food_database_service.dart'; // Import the FoodDatabaseHelper
+import '/database/database_helper.dart'; // Import DatabaseHelper
 
 class GeminiService {
   final String apiKey =
@@ -27,7 +27,7 @@ class GeminiService {
 
       // Create the prompt TextPart
       final prompt =
-          'Analyze the food items in this image.Do not write anything else than food names.';
+          'Analyze the food items in this image. Do not write anything else than food names.';
 
       // Send the content to Gemini and collect the responses
       final responses = model.generateContentStream([
@@ -48,11 +48,18 @@ class GeminiService {
       // Insert food items into the database
       List<String> foodItems =
           aiResponse.split(',').map((e) => e.trim()).toList();
+
+      // Insert each food item directly into the database
       for (var food in foodItems) {
         if (food.isNotEmpty) {
-          await FoodDatabaseService().insertFood(food);
+          // Insert into the inventory table of the database
+          await DatabaseHelper().insertInventory({'food_name': food});
         }
       }
+
+      // Fetch all items from the inventory and log them for debugging
+      final inventory = await DatabaseHelper().getInventory();
+      //print("Items in inventory: $inventory");
 
       return aiResponse; // Return the full response
     } catch (e) {

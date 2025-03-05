@@ -1,29 +1,33 @@
 import 'package:flutter/material.dart';
-import 'screens/onboarding_page.dart';
-import 'services/food_database_service.dart';
-import 'dart:developer' as developer;
+import 'package:flutter_application/screens/home_page.dart';
+import 'package:logging/logging.dart'; // Import logging package
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+void setupLogging() {
+  // Enable hierarchical logging (necessary for modifying non-root loggers)
+  Logger.root.level = Level.ALL; // Set the level for root logger
+  Logger.root.onRecord.listen((record) {
+    print('${record.level.name}: ${record.time}: ${record.message}');
+  });
 
-  // Initialize the SQLite database
-  final db = await FoodDatabaseService().initDatabase();
-  developer.log("Database path: ${db.path}", name: "Database");
-  runApp(const MyApp());
+  // Example of setting up a non-root logger if needed
+  var myLogger = Logger('MyLogger');
+  myLogger.info("My custom logger initialized.");
+}
+
+void main() {
+  setupLogging(); // Initialize logging when the app starts
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fridge Genius',
+      title: 'Fridge App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
-        brightness: Brightness.dark,
       ),
-      home: const OnboardingPage(),
+      home: const HomePage(),
     );
   }
 }

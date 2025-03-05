@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+/* import 'package:flutter/material.dart';
 import '../services/food_database_service.dart'; // Import the FoodDatabaseHelper
 
 class GeminiResponsePage extends StatelessWidget {
@@ -62,3 +62,4 @@ class GeminiResponsePage extends StatelessWidget {
     );
   }
 }
+ */

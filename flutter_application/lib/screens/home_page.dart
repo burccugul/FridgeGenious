@@ -5,8 +5,8 @@ import 'shopping_list_page.dart';
 import 'settings_page.dart';
 import '../services/gemini_image_service.dart';
 import 'dart:io';
-import '../services/food_database_service.dart';
-import 'dart:developer' as developer;
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:path_provider/path_provider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -84,10 +84,11 @@ class HomePageState extends State<HomePage> {
                     textColor: Colors.black,
                     onPressed: () async {
                       String imagePath =
-                          "/Users/burcugul/FridgeGenious/test_image.jpg"; // Replace with your actual image path
-                      File imageFile = File(imagePath);
+                          "assets/images/test_image2.jpg"; // Correct path
+                      File? imageFile =
+                          await _loadAsset(imagePath); // Nullable File
 
-                      if (!imageFile.existsSync()) {
+                      if (imageFile == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                               content: Text("Image not found: $imagePath")),
@@ -99,16 +100,12 @@ class HomePageState extends State<HomePage> {
                       String aiResponse =
                           await geminiService.analyzeImage(imageFile);
 
-                      // Log the response here for debugging
-                      developer.log("AI Response: $aiResponse");
-                      WidgetsFlutterBinding.ensureInitialized();
+                      // Show the response (Optional)
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(aiResponse)),
+                      );
 
-                      // Initialize the SQLite database
-                      final db = await FoodDatabaseService().initDatabase();
-                      developer.log("Database path: ${db.path}");
-
-                      if (!context.mounted) return;
-                      // Pass the response to GeminiResponsePage
+                      // Navigate to FridgePage (or wherever you need)
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -155,6 +152,22 @@ class HomePageState extends State<HomePage> {
       ),
       bottomNavigationBar: _buildCurvedNavigationBar(),
     );
+  }
+
+  // _loadAsset method to load asset and return File
+  Future<File?> _loadAsset(String path) async {
+    try {
+      final byteData =
+          await rootBundle.load(path); // Load the asset from the path
+      final buffer = byteData.buffer.asUint8List(); // Convert to byte array
+      final tempDir = await getTemporaryDirectory(); // Get temporary directory
+      final tempFile =
+          File('${tempDir.path}/test_image.jpg'); // Create a temporary file
+      await tempFile.writeAsBytes(buffer); // Write the bytes to the temp file
+      return tempFile; // Return the temporary file
+    } catch (e) {
+      return null; // If there is an error, return null
+    }
   }
 
   Widget _buildCurvedNavigationBar() {
