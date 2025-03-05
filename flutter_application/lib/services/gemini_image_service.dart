@@ -57,10 +57,6 @@ class GeminiService {
         }
       }
 
-      // Fetch all items from the inventory and log them for debugging
-      final inventory = await DatabaseHelper().getInventory();
-      //print("Items in inventory: $inventory");
-
       return aiResponse; // Return the full response
     } catch (e) {
       // If an error occurs, return the error message

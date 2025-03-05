@@ -89,6 +89,8 @@ class HomePageState extends State<HomePage> {
                           await _loadAsset(imagePath); // Nullable File
 
                       if (imageFile == null) {
+                        // Check if the widget is still mounted before using context
+                        if (!mounted) return; // Early exit if not mounted
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                               content: Text("Image not found: $imagePath")),
@@ -100,6 +102,10 @@ class HomePageState extends State<HomePage> {
                       String aiResponse =
                           await geminiService.analyzeImage(imageFile);
 
+                      // Check if widget is mounted before UI-related operations
+                      if (!mounted)
+                        return; // Prevent using context if widget is not mounted
+
                       // Show the response (Optional)
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text(aiResponse)),
@@ -108,9 +114,7 @@ class HomePageState extends State<HomePage> {
                       // Navigate to FridgePage (or wherever you need)
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (context) => FridgePage(),
-                        ),
+                        MaterialPageRoute(builder: (context) => FridgePage()),
                       );
                     },
                   ),
