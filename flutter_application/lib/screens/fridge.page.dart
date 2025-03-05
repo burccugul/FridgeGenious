@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application/database/database_helper.dart';
 import 'recipe_page.dart';
+import 'package:logging/logging.dart';
+
+// Create a Logger instance
+final Logger _logger = Logger('FridgeApp');
 
 class FridgePage extends StatefulWidget {
   const FridgePage({super.key});
@@ -7,6 +12,33 @@ class FridgePage extends StatefulWidget {
   @override
   FridgePageState createState() => FridgePageState();
 }
+
+void getInventoryItems() async {
+  try {
+    // DatabaseHelper instance oluştur
+    DatabaseHelper dbHelper = DatabaseHelper();
+
+    // Verileri al
+    List<Map<String, dynamic>> inventory = await dbHelper.getInventory();
+
+    if (inventory.isEmpty) {
+      // Veritabanında hiç veri yoksa uyarı ver
+      _logger.warning('No items found in the database');
+    } else {
+      // Veritabanındaki her bir item'dan sadece food_name'i yazdır
+      for (var item in inventory) {
+        var foodName = item['food_name']; // food_name sütununu al
+        if (foodName != null) {
+          _logger.info('Food name: $foodName');
+        }
+      }
+    }
+  } catch (e) {
+    // Veritabanı hatası durumunda hata logu
+    _logger.severe('Error fetching inventory: $e');
+  }
+}
+
 
 class FridgePageState extends State<FridgePage> with SingleTickerProviderStateMixin{
   late TabController _tabController;
@@ -66,6 +98,9 @@ class FridgePageState extends State<FridgePage> with SingleTickerProviderStateMi
     super.initState();
     filteredIngredients = allIngredients;
     _tabController = TabController(length: 3, vsync: this);
+    
+    // Call getInventoryItems to fetch and print inventory data
+    getInventoryItems();
   }
 
   void searchIngredients(String query) {
@@ -304,4 +339,3 @@ class FridgePageState extends State<FridgePage> with SingleTickerProviderStateMi
     );
   }
 }
-
