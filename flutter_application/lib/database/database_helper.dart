@@ -19,7 +19,7 @@ class DatabaseHelper {
 
   Future<Database> _initDatabase() async {
     // Here, specify the path to the existing database (identifier.sqlite).
-    String path = join('/Users/iremgungor/FridgeGenious', 'identifier.sqlite');
+    String path = join('/Users/burcugul/FridgeGenious/', 'identifier.sqlite');
     return await openDatabase(path, version: 1);
   }
 
@@ -32,6 +32,7 @@ class DatabaseHelper {
   // Insert an item into the inventory (optional)
   Future<void> insertInventory(Map<String, dynamic> item) async {
     final db = await database;
-    await db.insert('inventory', item, conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('inventory', item,
+        conflictAlgorithm: ConflictAlgorithm.replace);
   }
 }

@@ -98,7 +98,9 @@ class _RecipePageState extends State<RecipePage>
             Padding(
               padding: const EdgeInsets.all(16),
               child: ElevatedButton(
-                onPressed: fetchGeneratedRecipe,
+                onPressed: () {
+                  fetchGeneratedRecipe();
+                },
                 child: isLoading
                     ? CircularProgressIndicator()
                     : Text(

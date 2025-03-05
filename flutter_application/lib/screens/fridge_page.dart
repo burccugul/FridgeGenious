@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application/database/database_helper.dart';
 import 'recipe_page.dart';
-import '/services/food_database_service.dart'; // Import the database helper
+import 'package:logging/logging.dart';
+
+// Create a Logger instance
+final Logger _logger = Logger('FridgeApp');
 
 class FridgePage extends StatefulWidget {
   const FridgePage({super.key});
@@ -9,15 +13,69 @@ class FridgePage extends StatefulWidget {
   FridgePageState createState() => FridgePageState();
 }
 
+void getInventoryItems() async {
+  try {
+    // DatabaseHelper instance oluştur
+    DatabaseHelper dbHelper = DatabaseHelper();
+
+    // Verileri al
+    List<Map<String, dynamic>> inventory = await dbHelper.getInventory();
+
+    if (inventory.isEmpty) {
+      // Veritabanında hiç veri yoksa uyarı ver
+      _logger.warning('No items found in the database');
+    } else {
+      // Veritabanındaki her bir item'dan sadece food_name'i yazdır
+      for (var item in inventory) {
+        var foodName = item['food_name']; // food_name sütununu al
+        if (foodName != null) {
+          _logger.info('Food name: $foodName');
+        }
+      }
+    }
+  } catch (e) {
+    // Veritabanı hatası durumunda hata logu
+    _logger.severe('Error fetching inventory: $e');
+  }
+}
+
 class FridgePageState extends State<FridgePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  List<Map<String, dynamic>> filteredIngredients = [];
-  String searchQuery = '';
-
-  // Database helper instance
-  final FoodDatabaseService _dbHelper = FoodDatabaseService();
-
+  final List<Map<String, dynamic>> allIngredients = [
+    {'name': 'Apple', 'emoji': '🍎', 'selected': false},
+    {'name': 'Banana', 'emoji': '🍌', 'selected': false},
+    {'name': 'Grapes', 'emoji': '🍇', 'selected': false},
+    {'name': 'Orange', 'emoji': '🍊', 'selected': false},
+    {'name': 'Strawberry', 'emoji': '🍓', 'selected': false},
+    {'name': 'Potato', 'emoji': '🥔', 'selected': false},
+    {'name': 'Carrot', 'emoji': '🥕', 'selected': false},
+    {'name': 'Broccoli', 'emoji': '🥦', 'selected': false},
+    {'name': 'Onion', 'emoji': '🧅', 'selected': false},
+    {'name': 'Garlic', 'emoji': '🧄', 'selected': false},
+    {'name': 'Tomato', 'emoji': '🍅', 'selected': false},
+    {'name': 'Eggplant', 'emoji': '🍆', 'selected': false},
+    {'name': 'Corn', 'emoji': '🌽', 'selected': false},
+    {'name': 'Lettuce', 'emoji': '🥬', 'selected': false},
+    {'name': 'Mushroom', 'emoji': '🍄', 'selected': false},
+    {'name': 'Cheese', 'emoji': '🧀', 'selected': false},
+    {'name': 'Milk', 'emoji': '🥛', 'selected': false},
+    {'name': 'Butter', 'emoji': '🧈', 'selected': false},
+    {'name': 'Egg', 'emoji': '🥚', 'selected': false},
+    {'name': 'Yogurt', 'emoji': '🍦', 'selected': false},
+    {'name': 'Fish', 'emoji': '🐟', 'selected': false},
+    {'name': 'Meat', 'emoji': '🥩', 'selected': false},
+    {'name': 'Chicken', 'emoji': '🍗', 'selected': false},
+    {'name': 'Rice', 'emoji': '🍚', 'selected': false},
+    {'name': 'Bread', 'emoji': '🍞', 'selected': false},
+    {'name': 'Pasta', 'emoji': '🍝', 'selected': false},
+    {'name': 'Peanut Butter', 'emoji': '🥜', 'selected': false},
+    {'name': 'Jam', 'emoji': '🍯', 'selected': false},
+    {'name': 'Honey', 'emoji': '🍯', 'selected': false},
+    {'name': 'Chili Pepper', 'emoji': '🌶️', 'selected': false},
+    {'name': 'Cucumber', 'emoji': '🥒', 'selected': false},
+    {'name': 'Pumpkin', 'emoji': '🎃', 'selected': false},
+  ];
   int _currentIndex = 0;
 
   final List<IconData> _icons = [
@@ -32,34 +90,26 @@ class FridgePageState extends State<FridgePage>
     super.dispose();
   }
 
+  List<Map<String, dynamic>> filteredIngredients = [];
+  String searchQuery = '';
+
   @override
   void initState() {
     super.initState();
+    filteredIngredients = allIngredients;
     _tabController = TabController(length: 3, vsync: this);
-    _loadFoodItems();
-  }
 
-  // Load food items from the database
-  Future<void> _loadFoodItems() async {
-    final List<String> foodItems = await _dbHelper.getAllFood();
-    setState(() {
-      filteredIngredients = foodItems
-          .map((name) => {
-                'name': name,
-                'emoji': '🍏',
-                'selected': false
-              }) // Using a default emoji for now
-          .toList();
-    });
+    // Call getInventoryItems to fetch and print inventory data
+    getInventoryItems();
   }
 
   void searchIngredients(String query) {
     setState(() {
       searchQuery = query;
       if (query.isEmpty) {
-        _loadFoodItems(); // Reload all food items if search is cleared
+        filteredIngredients = allIngredients;
       } else {
-        filteredIngredients = filteredIngredients
+        filteredIngredients = allIngredients
             .where((ingredient) =>
                 ingredient['name'].toLowerCase().contains(query.toLowerCase()))
             .toList();
@@ -67,21 +117,28 @@ class FridgePageState extends State<FridgePage>
     });
   }
 
-  int get selectedCount =>
-      filteredIngredients.where((i) => i['selected']).length;
+  int get selectedCount => allIngredients.where((i) => i['selected']).length;
 
   void toggleIngredient(int index) {
     setState(() {
       filteredIngredients[index]['selected'] =
           !filteredIngredients[index]['selected'];
+      // Update the corresponding ingredient in allIngredients
+      int allIngredientsIndex = allIngredients.indexWhere((ingredient) =>
+          ingredient['name'] == filteredIngredients[index]['name']);
+      if (allIngredientsIndex != -1) {
+        allIngredients[allIngredientsIndex]['selected'] =
+            filteredIngredients[index]['selected'];
+      }
     });
   }
 
   void resetSelection() {
     setState(() {
-      for (var ingredient in filteredIngredients) {
+      for (var ingredient in allIngredients) {
         ingredient['selected'] = false;
       }
+      searchIngredients(searchQuery); // Reapply the current search
     });
   }
 
