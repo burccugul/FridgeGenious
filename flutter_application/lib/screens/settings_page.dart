@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 enum TextSize { small, medium, large }
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({Key? key}) : super(key: key);
+  const SettingsPage({super.key});
 
   @override
-  _SettingsPageState createState() => _SettingsPageState();
+  SettingsPageState createState() => SettingsPageState();
 }
 
-class _SettingsPageState extends State<SettingsPage> {
+class SettingsPageState extends State<SettingsPage> {
   // State variables
   bool isDarkMode = false;
   String selectedLanguage = 'English';
@@ -25,14 +25,14 @@ class _SettingsPageState extends State<SettingsPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-      backgroundColor: Colors.white, // White background
-      iconTheme: const IconThemeData(color: Colors.black), // Black icons
-      title: const Text(
-        'Settings',
-        style: TextStyle(color: Colors.black), // Black text
+        backgroundColor: Colors.white, // White background
+        iconTheme: const IconThemeData(color: Colors.black), // Black icons
+        title: const Text(
+          'Settings',
+          style: TextStyle(color: Colors.black), // Black text
+        ),
+        elevation: 0,
       ),
-      elevation: 0,
-    ),
       body: ListView(
         children: [
           // Profile Settings Section

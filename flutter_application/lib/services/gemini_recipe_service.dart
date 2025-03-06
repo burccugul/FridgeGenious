@@ -1,5 +1,5 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
-import 'food_database_service.dart'; // Import the FoodDatabaseHelper
+import '/database/database_helper.dart'; // Güncel DatabaseHelper'ı buraya import et
 
 class GeminiRecipeService {
   final String apiKey =
@@ -13,9 +13,13 @@ class GeminiRecipeService {
     );
   }
 
-  // Function to get ingredients from the database
+  // Function to get ingredients from the inventory database
   Future<List<String>> getIngredientsFromDatabase() async {
-    return await FoodDatabaseService().getAllFood();
+    // Fetch inventory items from the new database
+    final inventory = await DatabaseHelper().getInventory();
+
+    // Extract food names from the inventory and return them
+    return inventory.map((item) => item['food_name'] as String).toList();
   }
 
   // Function to generate a recipe from the ingredients
@@ -25,9 +29,8 @@ class GeminiRecipeService {
     }
 
     // Create the prompt for the Gemini model
-    String prompt = "Generate a recipe using the following ingredients: " +
-        ingredients.join(', ') +
-        ". The recipe should include the ingredients and detailed steps.";
+    String prompt = "Generate a recipe using the following ingredients: "
+        "${ingredients.join(', ')}. The recipe should include the ingredients and detailed steps.";
 
     try {
       // Generate the recipe using Gemini

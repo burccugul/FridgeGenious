@@ -32,6 +32,9 @@ dependencies:
     sdk: flutter
   logger: ^1.1.0
   logging: ^1.0.2
+  google_generative_ai: ^0.4.6
+  image_picker: ^1.1.2
+
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -70,6 +73,10 @@ flutter:
     - assets/images/fries.png
     - assets/images/omelet.png
     - assets/images/egg.png
+    - assets/images/test_image.jpg
+    - assets/images/test_image2.jpg
+  
+    
        
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

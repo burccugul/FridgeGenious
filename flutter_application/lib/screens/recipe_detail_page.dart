@@ -9,14 +9,14 @@ class RecipeDetailPage extends StatelessWidget {
   final List<String> directions;
 
   const RecipeDetailPage({
-    Key? key,
+    super.key,
     required this.name,
     required this.imagePath,
     required this.cookingTime,
     required this.description,
     required this.ingredients,
     required this.directions,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

@@ -5,7 +5,7 @@ import 'shopping_list_page.dart';
 import 'settings_page.dart';
 import '../services/gemini_image_service.dart';
 import 'dart:io';
-import '../services/food_database_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -16,12 +16,58 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   int _currentIndex = 0;
-
   final List<IconData> _icons = [
     Icons.home,
     Icons.camera_alt_outlined,
     Icons.settings,
   ];
+
+  // Kamera ve galeri seçimi için image picker
+  final ImagePicker _picker = ImagePicker();
+
+  // Seçilen fotoğrafı saklamak için bir değişken
+  File? _image;
+
+  // Kamera veya galeriden fotoğraf seçme işlemi
+  Future<void> _pickImage() async {
+    final pickedFile = await showDialog<File>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Choose an option"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text("Take a Photo"),
+                onTap: () async {
+                  final image =
+                      await _picker.pickImage(source: ImageSource.camera);
+                  Navigator.pop(
+                      context, image == null ? null : File(image.path));
+                },
+              ),
+              ListTile(
+                title: Text("Choose from Gallery"),
+                onTap: () async {
+                  final image =
+                      await _picker.pickImage(source: ImageSource.gallery);
+                  Navigator.pop(
+                      context, image == null ? null : File(image.path));
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (pickedFile != null) {
+      setState(() {
+        _image = pickedFile; // Seçilen fotoğrafı sakla
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +121,7 @@ class HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: 40),
+                  // "What's Inside My Fridge" butonu
                   _buildCustomButton(
                     text: "What's Inside My Fridge",
                     icon: Icons.kitchen,
@@ -82,40 +129,40 @@ class HomePageState extends State<HomePage> {
                     color: const Color.fromARGB(255, 255, 255, 255),
                     textColor: Colors.black,
                     onPressed: () async {
-                      String imagePath =
-                          "/Users/burcugul/FridgeGenious/test_image.jpg"; // Replace with your actual image path
-                      File imageFile = File(imagePath);
-
-                      if (!imageFile.existsSync()) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text("Image not found: $imagePath")),
-                        );
+                      if (_image == null) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("No image selected")),
+                          );
+                        }
                         return;
                       }
 
+                      // Fotoğraf seçildiyse Gemini API'ye gönder
                       GeminiService geminiService = GeminiService();
                       String aiResponse =
-                          await geminiService.analyzeImage(imageFile);
+                          await geminiService.analyzeImage(_image!);
 
-                      // Log the response here for debugging
-                      print("AI Response: $aiResponse");
-                      WidgetsFlutterBinding.ensureInitialized();
+                      // Gemini'den gelen yanıtı göster
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(aiResponse)),
+                        );
+                      }
 
-                      // Initialize the SQLite database
-                      final db = await FoodDatabaseService().initDatabase();
-                      print("Database path: ${db.path}");
-
-                      // Pass the response to GeminiResponsePage
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => FridgePage(),
-                        ),
-                      );
+                      // FridgePage'e geçiş
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FridgePage(),
+                          ),
+                        );
+                      }
                     },
                   ),
                   const SizedBox(height: 70),
+                  // Diğer butonlar
                   _buildCustomButton(
                     text: "Suggest Recipe",
                     icon: Icons.book,
@@ -155,6 +202,7 @@ class HomePageState extends State<HomePage> {
     );
   }
 
+  // Custom navigation bar
   Widget _buildCurvedNavigationBar() {
     return Container(
       decoration: BoxDecoration(
@@ -178,8 +226,10 @@ class HomePageState extends State<HomePage> {
                   _currentIndex = index;
                 });
 
-                // Sayfa geçişi
-                if (index == 2) {
+                // Kamera iconuna tıklanması
+                if (index == 1) {
+                  _pickImage(); // Kamera veya galeriden fotoğraf seçme
+                } else if (index == 2) {
                   // Settings Page
                   Navigator.push(
                     context,
@@ -212,6 +262,7 @@ class HomePageState extends State<HomePage> {
     );
   }
 
+  // Custom button widget
   Widget _buildCustomButton({
     required String text,
     required IconData icon,
