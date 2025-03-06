@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application/screens/login_page.dart';
 
-
 class OnboardingPage extends StatelessWidget {
   const OnboardingPage({super.key});
 
@@ -20,7 +19,7 @@ class OnboardingPage extends StatelessWidget {
               colorBlendMode: BlendMode.darken,
             ),
           ),
-          
+
           // Main Content
           SafeArea(
             child: Column(
@@ -61,7 +60,8 @@ class OnboardingPage extends StatelessWidget {
                         'assets/images/orange.png',
                         width: 128,
                         height: 128,
-                        fit: BoxFit.cover, // Ensures the image fills the circle without stretching
+                        fit: BoxFit
+                            .cover, // Ensures the image fills the circle without stretching
                       ),
                     ),
                   ),
@@ -135,7 +135,8 @@ class OnboardingPage extends StatelessWidget {
                         onPressed: () {
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => const LoginPage()),
+                            MaterialPageRoute(
+                                builder: (context) => const LoginPage()),
                           );
                         },
                         isMain: true,
@@ -152,19 +153,20 @@ class OnboardingPage extends StatelessWidget {
 
                 // Decorative Bottle Image
                 Align(
-                alignment: Alignment.bottomLeft,
-                child: Padding(
-                  padding: const EdgeInsets.only(left: 32.0, bottom: 32.0),
-                  child: ClipOval(
-                    child: Image.asset(
-                      'assets/images/bottle.png', // Add your bottle image
-                      width: 128,
-                      height: 128,
-                      fit: BoxFit.cover, // Ensures the image fills the circle without stretching
+                  alignment: Alignment.bottomLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 32.0, bottom: 32.0),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'assets/images/bottle.png', // Add your bottle image
+                        width: 128,
+                        height: 128,
+                        fit: BoxFit
+                            .cover, // Ensures the image fills the circle without stretching
+                      ),
                     ),
                   ),
                 ),
-              ),
               ],
             ),
           ),

@@ -5,8 +5,7 @@ import 'shopping_list_page.dart';
 import 'settings_page.dart';
 import '../services/gemini_image_service.dart';
 import 'dart:io';
-import 'package:flutter/services.dart' show rootBundle;
-import 'package:path_provider/path_provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -17,12 +16,58 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   int _currentIndex = 0;
-
   final List<IconData> _icons = [
     Icons.home,
     Icons.camera_alt_outlined,
     Icons.settings,
   ];
+
+  // Kamera ve galeri seçimi için image picker
+  final ImagePicker _picker = ImagePicker();
+
+  // Seçilen fotoğrafı saklamak için bir değişken
+  File? _image;
+
+  // Kamera veya galeriden fotoğraf seçme işlemi
+  Future<void> _pickImage() async {
+    final pickedFile = await showDialog<File>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text("Choose an option"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text("Take a Photo"),
+                onTap: () async {
+                  final image =
+                      await _picker.pickImage(source: ImageSource.camera);
+                  Navigator.pop(
+                      context, image == null ? null : File(image.path));
+                },
+              ),
+              ListTile(
+                title: Text("Choose from Gallery"),
+                onTap: () async {
+                  final image =
+                      await _picker.pickImage(source: ImageSource.gallery);
+                  Navigator.pop(
+                      context, image == null ? null : File(image.path));
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    if (pickedFile != null) {
+      setState(() {
+        _image = pickedFile; // Seçilen fotoğrafı sakla
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +121,7 @@ class HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: 40),
+                  // "What's Inside My Fridge" butonu
                   _buildCustomButton(
                     text: "What's Inside My Fridge",
                     icon: Icons.kitchen,
@@ -83,42 +129,40 @@ class HomePageState extends State<HomePage> {
                     color: const Color.fromARGB(255, 255, 255, 255),
                     textColor: Colors.black,
                     onPressed: () async {
-                      String imagePath =
-                          "assets/images/test_image2.jpg"; // Correct path
-                      File? imageFile =
-                          await _loadAsset(imagePath); // Nullable File
-
-                      if (imageFile == null) {
-                        // Check if the widget is still mounted before using context
-                        if (!mounted) return; // Early exit if not mounted
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                              content: Text("Image not found: $imagePath")),
-                        );
+                      if (_image == null) {
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text("No image selected")),
+                          );
+                        }
                         return;
                       }
 
+                      // Fotoğraf seçildiyse Gemini API'ye gönder
                       GeminiService geminiService = GeminiService();
                       String aiResponse =
-                          await geminiService.analyzeImage(imageFile);
+                          await geminiService.analyzeImage(_image!);
 
-                      // Check if widget is mounted before UI-related operations
-                      if (!mounted)
-                        return; // Prevent using context if widget is not mounted
+                      // Gemini'den gelen yanıtı göster
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(aiResponse)),
+                        );
+                      }
 
-                      // Show the response (Optional)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(aiResponse)),
-                      );
-
-                      // Navigate to FridgePage (or wherever you need)
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => FridgePage()),
-                      );
+                      // FridgePage'e geçiş
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => FridgePage(),
+                          ),
+                        );
+                      }
                     },
                   ),
                   const SizedBox(height: 70),
+                  // Diğer butonlar
                   _buildCustomButton(
                     text: "Suggest Recipe",
                     icon: Icons.book,
@@ -158,22 +202,7 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  // _loadAsset method to load asset and return File
-  Future<File?> _loadAsset(String path) async {
-    try {
-      final byteData =
-          await rootBundle.load(path); // Load the asset from the path
-      final buffer = byteData.buffer.asUint8List(); // Convert to byte array
-      final tempDir = await getTemporaryDirectory(); // Get temporary directory
-      final tempFile =
-          File('${tempDir.path}/test_image.jpg'); // Create a temporary file
-      await tempFile.writeAsBytes(buffer); // Write the bytes to the temp file
-      return tempFile; // Return the temporary file
-    } catch (e) {
-      return null; // If there is an error, return null
-    }
-  }
-
+  // Custom navigation bar
   Widget _buildCurvedNavigationBar() {
     return Container(
       decoration: BoxDecoration(
@@ -197,8 +226,10 @@ class HomePageState extends State<HomePage> {
                   _currentIndex = index;
                 });
 
-                // Sayfa geçişi
-                if (index == 2) {
+                // Kamera iconuna tıklanması
+                if (index == 1) {
+                  _pickImage(); // Kamera veya galeriden fotoğraf seçme
+                } else if (index == 2) {
                   // Settings Page
                   Navigator.push(
                     context,
@@ -231,6 +262,7 @@ class HomePageState extends State<HomePage> {
     );
   }
 
+  // Custom button widget
   Widget _buildCustomButton({
     required String text,
     required IconData icon,

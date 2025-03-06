@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/screens/home_page.dart';
 import 'package:logging/logging.dart'; // Import logging package
+import 'package:flutter_application/screens/onboarding_page.dart';
 
 void setupLogging() {
   // Enable hierarchical logging (necessary for modifying non-root loggers)
@@ -27,7 +27,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const HomePage(),
+      home: const OnboardingPage(),
     );
   }
 }
