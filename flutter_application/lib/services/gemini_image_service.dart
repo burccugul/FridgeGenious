@@ -22,44 +22,56 @@ class GeminiService {
   // Function to analyze an image
   Future<String> analyzeImage(File imageFile) async {
     try {
-      // Create the image DataPart
       final imagePart = await fileToPart('image/jpeg', imageFile.path);
+      String currentDateTime = DateTime.now().toString();
+      final prompt = '''Analyze the food items in this image. 
+          List them along with their quantities in the format: FoodName, Quantity (e.g., Apple, 2, Banana, 3).
+          If a food item has an expiration date visible, provide it as well.
+          If a food item hasn't an expiration date visible, provide a reasonable estimate based on the type of food. 
+          You can add your estimated time into $currentDateTime.
+          You should write only food name, quantity, and expiration date in the format: FoodName, Quantity, ExpirationDate (e.g., Apple, 2, 2025-03-11 00:06:22.880006).
+          Please do not write other things.
+          ''';
 
-      // Create the prompt TextPart
-      final prompt =
-          'Analyze the food items in this image. Do not write anything else than food names.';
-
-      // Send the content to Gemini and collect the responses
       final responses = model.generateContentStream([
         Content.multi([TextPart(prompt), imagePart])
       ]);
 
-      // Collect all the responses and combine them
       String aiResponse = '';
       await for (final response in responses) {
         aiResponse += response.text ?? ''; // Append each response's text
       }
 
-      // If there's no response text, return a default message
       if (aiResponse.isEmpty) {
         return "No food items detected in the image.";
       }
+      print("AI Response: $aiResponse");
+      // Split the response into food items (e.g., 'Apple, 2, Banana, 3')
+      List<String> foodItems = aiResponse.split(',');
 
-      // Insert food items into the database
-      List<String> foodItems =
-          aiResponse.split(',').map((e) => e.trim()).toList();
+// Veriyi virgülle ayıralım
 
-      // Insert each food item directly into the database
-      for (var food in foodItems) {
-        if (food.isNotEmpty) {
-          // Insert into the inventory table of the database
-          await DatabaseHelper().insertInventory({'food_name': food});
-        }
-      }
+// İlgili bileşenleri işleyelim
+      String foodName = foodItems[0].trim(); // Örneğin: Apple
+      int quantity = int.tryParse(foodItems[1].trim()) ?? 1; // Örneğin: 1
+      String expirationDate =
+          foodItems[2].trim(); // Örneğin: 2025-03-18 00:22:28.911580
 
-      return aiResponse; // Return the full response
+// Çıktıyı kontrol edelim
+      print("Food Name: $foodName");
+      print("Quantity: $quantity");
+      print("Expiration Date: $expirationDate");
+
+      // Insert food and quantity into the database
+      await DatabaseHelper().insertInventory({
+        'food_name': foodName,
+        'quantity': quantity,
+        'last_image_upload': currentDateTime,
+        'expiration_date': expirationDate,
+      });
+
+      return aiResponse;
     } catch (e) {
-      // If an error occurs, return the error message
       return "Error analyzing image: $e";
     }
   }

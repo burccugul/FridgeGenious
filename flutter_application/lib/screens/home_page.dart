@@ -6,6 +6,7 @@ import 'settings_page.dart';
 import '../services/gemini_image_service.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_application/database/database_helper.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -22,24 +23,21 @@ class HomePageState extends State<HomePage> {
     Icons.settings,
   ];
 
-  // Kamera ve galeri seçimi için image picker
   final ImagePicker _picker = ImagePicker();
-
-  // Seçilen fotoğrafı saklamak için bir değişken
   File? _image;
+  List<Map<String, dynamic>> inventoryItems = [];
 
-  // Kamera veya galeriden fotoğraf seçme işlemi
   Future<void> _pickImage() async {
     final pickedFile = await showDialog<File>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text("Choose an option"),
+          title: const Text("Choose an option"),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               ListTile(
-                title: Text("Take a Photo"),
+                title: const Text("Take a Photo"),
                 onTap: () async {
                   final image =
                       await _picker.pickImage(source: ImageSource.camera);
@@ -48,7 +46,7 @@ class HomePageState extends State<HomePage> {
                 },
               ),
               ListTile(
-                title: Text("Choose from Gallery"),
+                title: const Text("Choose from Gallery"),
                 onTap: () async {
                   final image =
                       await _picker.pickImage(source: ImageSource.gallery);
@@ -64,8 +62,40 @@ class HomePageState extends State<HomePage> {
 
     if (pickedFile != null) {
       setState(() {
-        _image = pickedFile; // Seçilen fotoğrafı sakla
+        _image = pickedFile;
       });
+    }
+
+    GeminiService geminiService = GeminiService();
+    String aiResponse = await geminiService.analyzeImage(_image!);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(aiResponse)),
+      );
+    }
+
+    await fetchInventory();
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => FridgePage(),
+        ),
+      );
+    }
+  }
+
+  Future<void> fetchInventory() async {
+    try {
+      DatabaseHelper dbHelper = DatabaseHelper();
+      List<Map<String, dynamic>> inventory = await dbHelper.getInventory();
+      setState(() {
+        inventoryItems = inventory;
+      });
+    } catch (e) {
+      print('Error fetching inventory: $e');
     }
   }
 
@@ -74,11 +104,7 @@ class HomePageState extends State<HomePage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Yellow background
-          Container(
-            color: const Color(0xFFFFB74D),
-          ),
-          // White curved section
+          Container(color: const Color(0xFFFFB74D)),
           Positioned(
             bottom: 0,
             left: 0,
@@ -89,7 +115,6 @@ class HomePageState extends State<HomePage> {
               child: Container(),
             ),
           ),
-          // Main content
           SafeArea(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
@@ -114,43 +139,19 @@ class HomePageState extends State<HomePage> {
                     alignment: Alignment.centerLeft,
                     child: Text(
                       'Let’s manage your fridge!',
-                      style: TextStyle(
-                        fontSize: 20,
-                        color: Colors.black54,
-                      ),
+                      style: TextStyle(fontSize: 20, color: Colors.black54),
                     ),
                   ),
                   const SizedBox(height: 40),
-                  // "What's Inside My Fridge" butonu
                   _buildCustomButton(
                     text: "What's Inside My Fridge",
                     icon: Icons.kitchen,
                     iconSize: 90,
-                    color: const Color.fromARGB(255, 255, 255, 255),
+                    color: Colors.white,
                     textColor: Colors.black,
                     onPressed: () async {
-                      if (_image == null) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text("No image selected")),
-                          );
-                        }
-                        return;
-                      }
+                      fetchInventory();
 
-                      // Fotoğraf seçildiyse Gemini API'ye gönder
-                      GeminiService geminiService = GeminiService();
-                      String aiResponse =
-                          await geminiService.analyzeImage(_image!);
-
-                      // Gemini'den gelen yanıtı göster
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text(aiResponse)),
-                        );
-                      }
-
-                      // FridgePage'e geçiş
                       if (mounted) {
                         Navigator.push(
                           context,
@@ -162,12 +163,10 @@ class HomePageState extends State<HomePage> {
                     },
                   ),
                   const SizedBox(height: 70),
-                  // Diğer butonlar
                   _buildCustomButton(
                     text: "Suggest Recipe",
                     icon: Icons.book,
                     iconSize: 40,
-                    iconColor: const Color.fromARGB(255, 0, 0, 0),
                     color: const Color.fromARGB(255, 241, 147, 7),
                     onPressed: () {
                       Navigator.push(
@@ -182,7 +181,6 @@ class HomePageState extends State<HomePage> {
                     text: "Suggest Shopping List",
                     icon: Icons.shopping_cart,
                     iconSize: 40,
-                    iconColor: const Color.fromARGB(255, 0, 0, 0),
                     color: const Color.fromARGB(255, 241, 147, 7),
                     onPressed: () {
                       Navigator.push(
@@ -202,7 +200,6 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  // Custom navigation bar
   Widget _buildCurvedNavigationBar() {
     return Container(
       decoration: BoxDecoration(
@@ -226,11 +223,9 @@ class HomePageState extends State<HomePage> {
                   _currentIndex = index;
                 });
 
-                // Kamera iconuna tıklanması
                 if (index == 1) {
-                  _pickImage(); // Kamera veya galeriden fotoğraf seçme
+                  _pickImage();
                 } else if (index == 2) {
-                  // Settings Page
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -262,7 +257,6 @@ class HomePageState extends State<HomePage> {
     );
   }
 
-  // Custom button widget
   Widget _buildCustomButton({
     required String text,
     required IconData icon,
@@ -270,7 +264,6 @@ class HomePageState extends State<HomePage> {
     required VoidCallback onPressed,
     double iconSize = 24,
     Color textColor = Colors.white,
-    Color iconColor = Colors.black,
   }) {
     return ElevatedButton.icon(
       onPressed: onPressed,
@@ -282,15 +275,8 @@ class HomePageState extends State<HomePage> {
           borderRadius: BorderRadius.circular(30),
         ),
       ),
-      icon: Icon(
-        icon,
-        size: iconSize,
-        color: iconColor,
-      ),
-      label: Text(
-        text,
-        style: TextStyle(fontSize: 18, color: textColor),
-      ),
+      icon: Icon(icon, size: iconSize, color: Colors.black),
+      label: Text(text, style: TextStyle(fontSize: 18, color: textColor)),
     );
   }
 }
@@ -301,19 +287,13 @@ class CurvedPainter extends CustomPainter {
     var paint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
-
     var path = Path();
     path.moveTo(0, size.height * 0.2);
     path.quadraticBezierTo(
-      size.width * 0.25,
-      size.height * 0.05,
-      size.width,
-      size.height * 0.15,
-    );
+        size.width * 0.25, size.height * 0.05, size.width, size.height * 0.15);
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
     path.close();
-
     canvas.drawPath(path, paint);
   }
 
