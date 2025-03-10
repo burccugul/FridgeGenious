@@ -35,4 +35,11 @@ class DatabaseHelper {
     await db.insert('inventory', item,
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
+
+  Future<bool> doesFoodExist(String foodName) async {
+    var db = await database;
+    var result = await db
+        .query('inventory', where: 'food_name = ?', whereArgs: [foodName]);
+    return result.isNotEmpty;
+  }
 }
