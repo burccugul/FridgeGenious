@@ -8,7 +8,7 @@ class GeminiRecipeService {
 
   GeminiRecipeService() {
     model = GenerativeModel(
-      model: "gemini-1.5-flash", // Ensure you use the correct model
+      model: "gemini-2.0-flash", // Ensure you use the correct model
       apiKey: apiKey,
     );
   }
@@ -29,8 +29,13 @@ class GeminiRecipeService {
     }
 
     // Create the prompt for the Gemini model
-    String prompt = "Generate a recipe using the following ingredients: "
-        "${ingredients.join(', ')}. The recipe should include the ingredients and detailed steps.";
+    String prompt = '''Generate a recipe using the following ingredients: 
+        ${ingredients.join(', ')}. 
+        Don't have to use all of them but recipe's ingredients should be all in this list. 
+        The recipe should include the all ingredients and all detailed steps.
+        Show recipe name, ingredients, and steps in the format: RecipeName, Ingredient1, Ingredient2, ..., Step1, Step2, ..., time.
+        Do not write other things from there. But write in nice format.
+        ''';
 
     try {
       // Generate the recipe using Gemini
@@ -42,6 +47,7 @@ class GeminiRecipeService {
       await for (final response in responses) {
         aiResponse += response.text ?? ''; // Append each response's text
       }
+      print("AI Response: $aiResponse"); // This will print the full response
 
       // If there's no response text, return a default message
       if (aiResponse.isEmpty) {

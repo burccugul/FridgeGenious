@@ -11,8 +11,7 @@ class FridgePage extends StatefulWidget {
   FridgePageState createState() => FridgePageState();
 }
 
-class FridgePageState extends State<FridgePage>
-    with SingleTickerProviderStateMixin {
+class FridgePageState extends State<FridgePage> {
   List<Map<String, dynamic>> inventoryItems = [];
 
   final Map<String, String> emojiMap = {
@@ -64,10 +63,13 @@ class FridgePageState extends State<FridgePage>
       setState(() {
         inventoryItems = inventory.map((item) {
           String foodName = item['food_name'];
+          // Ensure quantity is converted to int
+          int quantity = int.tryParse(item['quantity'].toString()) ?? 0;
           return {
             'name': foodName,
             'emoji': emojiMap[foodName] ?? '❓',
-            'selected': false
+            'quantity': quantity,
+            'selected': false,
           };
         }).toList();
       });
@@ -76,24 +78,29 @@ class FridgePageState extends State<FridgePage>
     }
   }
 
-  Future<void> addFoodToInventory(String foodName) async {
+  Future<void> updateQuantity(String foodName, int newQuantity) async {
     try {
       DatabaseHelper dbHelper = DatabaseHelper();
-      // Veritabanında zaten mevcut mu kontrol et
-      bool foodExists = await dbHelper.doesFoodExist(foodName);
 
-      if (!foodExists) {
-        // Eğer mevcut değilse, veritabanına ekle
-        await dbHelper.insertInventory({
+      // If the quantity is 0 or less, don't delete from inventory
+      if (newQuantity <= 0) {
+        // Add the item to the shopping list if the quantity reaches 0
+        await dbHelper.insertShoppingList({
           'food_name': foodName,
-          'quantity': 1, // varsayılan olarak 1 adet
-          'expiration_date':
-              DateTime.now().toString(), // geçici bir son kullanma tarihi
+          'remove_date': DateTime.now()
+              .toString(), // Store when it was added to shopping list
         });
-        fetchInventory(); // En son verileri tekrar al
+
+        // Update the inventory to set the quantity to 0 instead of deleting it
+        await dbHelper.updateInventoryQuantity(foodName, 0);
+      } else {
+        // If the quantity is greater than 0, update the inventory
+        await dbHelper.updateInventoryQuantity(foodName, newQuantity);
       }
+
+      fetchInventory(); // Refresh the inventory list after update
     } catch (e) {
-      _logger.severe('Error adding food to inventory: $e');
+      _logger.severe('Error updating quantity: $e');
     }
   }
 
@@ -141,6 +148,31 @@ class FridgePageState extends State<FridgePage>
                         const SizedBox(height: 8),
                         Text(ingredient['name'],
                             style: const TextStyle(fontSize: 16)),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.remove),
+                              onPressed: () {
+                                if (ingredient['quantity'] > 0) {
+                                  int newQuantity = ingredient['quantity'] - 1;
+                                  updateQuantity(
+                                      ingredient['name'], newQuantity);
+                                }
+                              },
+                            ),
+                            Text('${ingredient['quantity']}',
+                                style: const TextStyle(fontSize: 16)),
+                            IconButton(
+                              icon: const Icon(Icons.add),
+                              onPressed: () {
+                                int newQuantity = ingredient['quantity'] + 1;
+                                updateQuantity(ingredient['name'], newQuantity);
+                              },
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),

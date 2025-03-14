@@ -1,16 +1,5 @@
 import 'package:flutter/material.dart';
-
-class Category {
-  final String name;
-  final String subtitle;
-  final IconData icon;
-
-  Category({
-    required this.name,
-    required this.subtitle,
-    required this.icon,
-  });
-}
+import 'package:flutter_application/services/gemini_shopping_list_service.dart'; // Import the service
 
 class ShoppingListPage extends StatefulWidget {
   const ShoppingListPage({super.key});
@@ -19,22 +8,20 @@ class ShoppingListPage extends StatefulWidget {
   State<ShoppingListPage> createState() => _ShoppingListPageState();
 }
 
-class _ShoppingListPageState extends State<ShoppingListPage> with SingleTickerProviderStateMixin {
+class _ShoppingListPageState extends State<ShoppingListPage>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
+  late GeminiShoppingListService shoppingListService;
 
-  final List<Category> categories = [
-    Category(name: 'Meats', subtitle: 'Frozen Meal', icon: Icons.lunch_dining),
-    Category(name: 'Vegetable', subtitle: 'Markets', icon: Icons.eco),
-    Category(name: 'Fruits', subtitle: 'Fresh Products', icon: Icons.apple),
-    Category(name: 'Breads', subtitle: 'Bakery', icon: Icons.breakfast_dining),
-    Category(name: 'Snacks', subtitle: 'Evening', icon: Icons.cookie),
-    Category(name: 'Bakery', subtitle: 'Meal and Flour', icon: Icons.bakery_dining),
-    Category(name: 'Dairy & Sweet', subtitle: 'In store', icon: Icons.egg),
-    Category(name: 'Chicken', subtitle: 'Frozen Meal', icon: Icons.set_meal),
-  ];
+  // Store the AI response for all categories
+  Map<String, List<String>> shoppingLists = {
+    "daily": [],
+    "weekly": [],
+    "monthly": [],
+  };
 
-  int _currentIndex = 0;
+  bool isLoading = false;
 
   final List<IconData> _icons = [
     Icons.home,
@@ -46,6 +33,10 @@ class _ShoppingListPageState extends State<ShoppingListPage> with SingleTickerPr
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    shoppingListService = GeminiShoppingListService();
+
+    // Generate shopping lists at startup
+    generateShoppingList();
   }
 
   @override
@@ -53,6 +44,34 @@ class _ShoppingListPageState extends State<ShoppingListPage> with SingleTickerPr
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  // Fetch and generate shopping list using Gemini AI
+  Future<void> generateShoppingList() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Get a single response with all categories
+      Map<String, List<String>> response =
+          await shoppingListService.generateShoppingList();
+
+      setState(() {
+        shoppingLists = response;
+        isLoading = false;
+      });
+    } catch (e) {
+      print("Error in generateShoppingList: $e");
+      setState(() {
+        shoppingLists = {
+          "daily": ["Error: $e"],
+          "weekly": ["Error: $e"],
+          "monthly": ["Error: $e"],
+        };
+        isLoading = false;
+      });
+    }
   }
 
   @override
@@ -73,6 +92,13 @@ class _ShoppingListPageState extends State<ShoppingListPage> with SingleTickerPr
           style: TextStyle(color: Colors.white, fontSize: 20),
         ),
         centerTitle: true,
+        actions: [
+          // Add refresh button
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: isLoading ? null : generateShoppingList,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -128,16 +154,25 @@ class _ShoppingListPageState extends State<ShoppingListPage> with SingleTickerPr
               ),
             ),
 
-            // Categories Grid
+            // Shopping List Display
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildCategoryGrid(),
-                  _buildCategoryGrid(),
-                  _buildCategoryGrid(),
-                ],
-              ),
+              child: isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                      ),
+                    )
+                  : TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildShoppingListView(
+                            shoppingLists["daily"] ?? [], 'daily'),
+                        _buildShoppingListView(
+                            shoppingLists["weekly"] ?? [], 'weekly'),
+                        _buildShoppingListView(
+                            shoppingLists["monthly"] ?? [], 'monthly'),
+                      ],
+                    ),
             ),
           ],
         ),
@@ -146,6 +181,49 @@ class _ShoppingListPageState extends State<ShoppingListPage> with SingleTickerPr
     );
   }
 
+  // Build shopping list view
+  Widget _buildShoppingListView(List<String> items, String category) {
+    if (items.isEmpty) {
+      return Center(
+        child: Text(
+          "No items found for $category shopping list",
+          style: TextStyle(color: Colors.white, fontSize: 16),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      margin: const EdgeInsets.all(16),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          String item = items[index].trim();
+          return ListTile(
+            leading: const Icon(Icons.shopping_basket,
+                color: Color.fromARGB(255, 241, 147, 7)),
+            title: Text(item),
+            trailing: IconButton(
+              icon: const Icon(Icons.add_circle_outline,
+                  color: Color.fromARGB(255, 241, 147, 7)),
+              onPressed: () {
+                // Add to cart functionality
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Added $item to cart')),
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Bottom Navigation Bar
   Widget _buildCurvedNavigationBar() {
     return Container(
       decoration: BoxDecoration(
@@ -166,76 +244,28 @@ class _ShoppingListPageState extends State<ShoppingListPage> with SingleTickerPr
             return GestureDetector(
               onTap: () {
                 setState(() {
-                  _currentIndex = index;
+                  // Handle tap navigation if needed
                 });
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOut,
-                width: _currentIndex == index ? 60 : 50,
-                height: _currentIndex == index ? 60 : 50,
+                width: 60,
+                height: 60,
                 decoration: BoxDecoration(
-                  color: _currentIndex == index ? const Color.fromARGB(255, 255, 230, 149) : Colors.grey[300],
+                  color: const Color.fromARGB(255, 255, 230, 149),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   _icons[index],
-                  size: _currentIndex == index ? 30 : 24,
-                  color: _currentIndex == index ? Colors.white : Colors.black54,
+                  size: 30,
+                  color: Colors.white,
                 ),
               ),
             );
           }),
         ),
       ),
-    );
-  }
-
-  Widget _buildCategoryGrid() {
-    return GridView.builder(
-      padding: const EdgeInsets.all(16),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.5,
-      ),
-      itemCount: categories.length,
-      itemBuilder: (context, index) {
-        final category = categories[index];
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                category.icon,
-                size: 32,
-                color: const Color.fromARGB(255, 241, 147, 7),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                category.name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              Text(
-                category.subtitle,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }

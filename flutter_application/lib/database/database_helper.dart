@@ -42,4 +42,37 @@ class DatabaseHelper {
         .query('inventory', where: 'food_name = ?', whereArgs: [foodName]);
     return result.isNotEmpty;
   }
+
+  Future<void> updateInventoryQuantity(String foodName, int newQuantity) async {
+    final db = await database;
+    await db.update(
+      'inventory',
+      {'quantity': newQuantity},
+      where: 'food_name = ?',
+      whereArgs: [foodName],
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getShoppingList() async {
+    final db = await database;
+    return await db.query('shoppinglist');
+  }
+
+  Future<void> insertShoppingList(Map<String, dynamic> item) async {
+    final db = await database;
+    await db.insert(
+      'shoppinglist', // Replace with your shoppinglist table name
+      item,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteFromInventory(String foodName) async {
+    final db = await database;
+    await db.delete(
+      'inventory', // Replace with your inventory table name
+      where: 'food_name = ?',
+      whereArgs: [foodName],
+    );
+  }
 }
