@@ -102,7 +102,7 @@ Only include the food names in the lists, no additional text.
       await for (final response in responses) {
         aiResponse += response.text ?? '';
       }
-      print("AI Response: $aiResponse"); // Log the response to the console
+      print("AI Response : $aiResponse"); // Log the response to the console
 
       if (aiResponse.isEmpty) {
         print("No response from AI.");

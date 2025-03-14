@@ -113,7 +113,10 @@ class SignUpPage extends StatelessWidget {
   }
 
   // Helper method to build text fields
-  Widget _buildTextField({required String hintText, required IconData icon, bool obscureText = false}) {
+  Widget _buildTextField(
+      {required String hintText,
+      required IconData icon,
+      bool obscureText = false}) {
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(maxWidth: 300),
@@ -134,7 +137,8 @@ class SignUpPage extends StatelessWidget {
           hintText: hintText,
           prefixIcon: Icon(icon),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),
       ),
     );
