@@ -8,15 +8,14 @@ class ForgotPasswordPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor:const Color(0xFFFFB74D),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () {
-            Navigator.pop(context); // Go back to the previous page
-          },
-        )
-      ),
+          backgroundColor: const Color(0xFFFFB74D),
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () {
+              Navigator.pop(context); // Go back to the previous page
+            },
+          )),
       body: Stack(
         children: [
           // Yellow background
@@ -82,7 +81,8 @@ class ForgotPasswordPage extends StatelessWidget {
                           hintText: 'Email',
                           prefixIcon: Icon(Icons.email_outlined),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 15),
                         ),
                       ),
                     ),

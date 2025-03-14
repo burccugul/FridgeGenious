@@ -9,7 +9,7 @@ class GeminiService {
 
   GeminiService() {
     model = GenerativeModel(
-      model: "gemini-1.5-flash", // Ensure you use the correct model
+      model: "gemini-2.0-flash", // Ensure you use the correct model
       apiKey: apiKey,
     );
   }
@@ -30,7 +30,7 @@ class GeminiService {
           If a food item hasn't an expiration date visible, provide a reasonable estimate based on the type of food. 
           You can add your estimated time into $currentDateTime.
           You should write only food name, quantity, and expiration date in the format: FoodName, Quantity, ExpirationDate (e.g., Apple, 2, 2025-03-11 00:06:22.880006).
-          Please do not write other things.
+          Please do not write other things, do not write food names as plural form, write them as singular form.
           ''';
 
       final responses = model.generateContentStream([
@@ -46,29 +46,34 @@ class GeminiService {
         return "No food items detected in the image.";
       }
       print("AI Response: $aiResponse");
-      // Split the response into food items (e.g., 'Apple, 2, Banana, 3')
-      List<String> foodItems = aiResponse.split(',');
 
-// Veriyi virgülle ayıralım
+      // Split the response by lines to handle multiple food items
+      List<String> foodItems = aiResponse.split('\n');
 
-// İlgili bileşenleri işleyelim
-      String foodName = foodItems[0].trim(); // Örneğin: Apple
-      int quantity = int.tryParse(foodItems[1].trim()) ?? 1; // Örneğin: 1
-      String expirationDate =
-          foodItems[2].trim(); // Örneğin: 2025-03-18 00:22:28.911580
+      // Process each food item line
+      for (String item in foodItems) {
+        // Split each line by commas
+        List<String> itemDetails = item.split(',');
 
-// Çıktıyı kontrol edelim
-      print("Food Name: $foodName");
-      print("Quantity: $quantity");
-      print("Expiration Date: $expirationDate");
+        if (itemDetails.length == 3) {
+          String foodName = itemDetails[0].trim(); // Food name
+          int quantity = int.tryParse(itemDetails[1].trim()) ?? 1; // Quantity
+          String expirationDate = itemDetails[2].trim(); // Expiration Date
 
-      // Insert food and quantity into the database
-      await DatabaseHelper().insertInventory({
-        'food_name': foodName,
-        'quantity': quantity,
-        'last_image_upload': currentDateTime,
-        'expiration_date': expirationDate,
-      });
+          // Output for debugging
+          print("Food Name: $foodName");
+          print("Quantity: $quantity");
+          print("Expiration Date: $expirationDate");
+
+          // Insert the item into the database
+          await DatabaseHelper().insertInventory({
+            'food_name': foodName,
+            'quantity': quantity,
+            'last_image_upload': currentDateTime,
+            'expiration_date': expirationDate,
+          });
+        }
+      }
 
       return aiResponse;
     } catch (e) {

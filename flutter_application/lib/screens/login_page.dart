@@ -108,7 +108,8 @@ class LoginPageState extends State<LoginPage> {
                           hintText: 'Username',
                           prefixIcon: Icon(Icons.person_outline),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 15),
                         ),
                       ),
                     ),
@@ -134,7 +135,8 @@ class LoginPageState extends State<LoginPage> {
                           hintText: 'Password',
                           prefixIcon: Icon(Icons.lock_outline),
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 15),
                         ),
                       ),
                     ),
@@ -147,12 +149,11 @@ class LoginPageState extends State<LoginPage> {
                         children: [
                           ElevatedButton(
                             onPressed: () {
-                              
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(builder: (context) => const HomePage()),
-                                );
-                              
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => const HomePage()),
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.black,
@@ -173,7 +174,8 @@ class LoginPageState extends State<LoginPage> {
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const SignUpPage()),
+                                MaterialPageRoute(
+                                    builder: (context) => const SignUpPage()),
                               );
                             },
                             child: const Text(
@@ -187,7 +189,9 @@ class LoginPageState extends State<LoginPage> {
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (context) => const ForgotPasswordPage()),
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ForgotPasswordPage()),
                               );
                             },
                             child: const Text(
@@ -238,4 +242,3 @@ class CurvedPainter extends CustomPainter {
   @override
   bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
-
