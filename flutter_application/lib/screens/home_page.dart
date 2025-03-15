@@ -4,9 +4,10 @@ import 'recipe_page.dart';
 import 'shopping_list_page.dart';
 import 'settings_page.dart';
 import '../services/gemini_image_service.dart';
+import '../services/supabase_helper.dart'; // ✅ Supabase Helper'ı ekledik
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_application/database/database_helper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -75,28 +76,51 @@ class HomePageState extends State<HomePage> {
       );
     }
 
-    await fetchInventory();
+    await fetchInventory(); // ✅ Supabase'ten envanteri çek
 
     if (mounted) {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => FridgePage(),
+          builder: (context) => const FridgePage(),
         ),
       );
     }
   }
 
+  // ✅ **Supabase'ten envanteri çekme fonksiyonu**
   Future<void> fetchInventory() async {
     try {
-      DatabaseHelper dbHelper = DatabaseHelper();
-      List<Map<String, dynamic>> inventory = await dbHelper.getInventory();
+      final response =
+          await Supabase.instance.client.from('inventory').select();
       setState(() {
-        inventoryItems = inventory;
+        inventoryItems = List<Map<String, dynamic>>.from(response);
       });
     } catch (e) {
-      print('Error fetching inventory: $e');
+      print('❌ Envanter verileri çekilirken hata oluştu: $e');
     }
+  }
+  Widget _buildCustomButton({
+    required String text,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+    double iconSize = 24,
+    Color textColor = Colors.white,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+        minimumSize: const Size(double.infinity, 60),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+        ),
+      ),
+      icon: Icon(icon, size: iconSize, color: Colors.black),
+      label: Text(text, style: TextStyle(fontSize: 18, color: textColor)),
+    );
   }
 
   @override
@@ -150,13 +174,13 @@ class HomePageState extends State<HomePage> {
                     color: Colors.white,
                     textColor: Colors.black,
                     onPressed: () async {
-                      fetchInventory();
+                      await fetchInventory(); // ✅ Supabase'ten envanter çek
 
                       if (mounted) {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => FridgePage(),
+                            builder: (context) => const FridgePage(),
                           ),
                         );
                       }
@@ -256,31 +280,8 @@ class HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  Widget _buildCustomButton({
-    required String text,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-    double iconSize = 24,
-    Color textColor = Colors.white,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-        minimumSize: const Size(double.infinity, 60),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ),
-      ),
-      icon: Icon(icon, size: iconSize, color: Colors.black),
-      label: Text(text, style: TextStyle(fontSize: 18, color: textColor)),
-    );
-  }
+  
 }
-
 class CurvedPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

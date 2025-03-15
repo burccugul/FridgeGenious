@@ -1,36 +1,32 @@
 import 'dart:io';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import '/database/database_helper.dart'; // Import DatabaseHelper
+import '../services/supabase_helper.dart'; // Supabase Helper'ı ekledik
 
 class GeminiService {
-  final String apiKey =
-      "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM"; // Replace with your API Key
+  final String apiKey = "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM"; // API Key buraya eklenecek
   late GenerativeModel model;
 
   GeminiService() {
     model = GenerativeModel(
-      model: "gemini-1.5-flash", // Ensure you use the correct model
+      model: "gemini-1.5-flash",
       apiKey: apiKey,
     );
   }
 
-  // Convert a file to a DataPart
   Future<DataPart> fileToPart(String mimeType, String path) async {
     return DataPart(mimeType, await File(path).readAsBytes());
   }
 
-  // Function to analyze an image
   Future<String> analyzeImage(File imageFile) async {
     try {
       final imagePart = await fileToPart('image/jpeg', imageFile.path);
-      String currentDateTime = DateTime.now().toString();
+      String currentDateTime = DateTime.now().toIso8601String();
+      
       final prompt = '''Analyze the food items in this image. 
-          List them along with their quantities in the format: FoodName, Quantity (e.g., Apple, 2, Banana, 3).
-          If a food item has an expiration date visible, provide it as well.
-          If a food item hasn't an expiration date visible, provide a reasonable estimate based on the type of food. 
-          You can add your estimated time into $currentDateTime.
-          You should write only food name, quantity, and expiration date in the format: FoodName, Quantity, ExpirationDate (e.g., Apple, 2, 2025-03-11 00:06:22.880006).
-          Please do not write other things.
+          List them along with their quantities in the format: 
+          FoodName, Quantity, ExpirationDate (e.g., Apple, 2, 2025-03-18 00:22:28.911580).
+          If an expiration date isn't visible, estimate it.
+          Do NOT include any additional text.
           ''';
 
       final responses = model.generateContentStream([
@@ -39,39 +35,37 @@ class GeminiService {
 
       String aiResponse = '';
       await for (final response in responses) {
-        aiResponse += response.text ?? ''; // Append each response's text
+        aiResponse += response.text ?? '';
       }
 
       if (aiResponse.isEmpty) {
         return "No food items detected in the image.";
       }
       print("AI Response: $aiResponse");
-      // Split the response into food items (e.g., 'Apple, 2, Banana, 3')
-      List<String> foodItems = aiResponse.split(',');
 
-// Veriyi virgülle ayıralım
+      // Veriyi satırlara ayır
+      List<String> foodItems = aiResponse.split('\n');
 
-// İlgili bileşenleri işleyelim
-      String foodName = foodItems[0].trim(); // Örneğin: Apple
-      int quantity = int.tryParse(foodItems[1].trim()) ?? 1; // Örneğin: 1
-      String expirationDate =
-          foodItems[2].trim(); // Örneğin: 2025-03-18 00:22:28.911580
+      for (String item in foodItems) {
+        List<String> itemDetails = item.split(',');
 
-// Çıktıyı kontrol edelim
-      print("Food Name: $foodName");
-      print("Quantity: $quantity");
-      print("Expiration Date: $expirationDate");
+        if (itemDetails.length == 3) {
+          String foodName = itemDetails[0].trim();
+          int quantity = int.tryParse(itemDetails[1].trim()) ?? 1;
+          String expirationDate = itemDetails[2].trim();
 
-      // Insert food and quantity into the database
-      await DatabaseHelper().insertInventory({
-        'food_name': foodName,
-        'quantity': quantity,
-        'last_image_upload': currentDateTime,
-        'expiration_date': expirationDate,
-      });
+          print("Food Name: $foodName");
+          print("Quantity: $quantity");
+          print("Expiration Date: $expirationDate");
+
+          // **Supabase'e kaydet**
+          await SupabaseHelper().insertInventoryItem(foodName, quantity, expirationDate);
+        }
+      }
 
       return aiResponse;
     } catch (e) {
+      print("❌ Hata: $e");
       return "Error analyzing image: $e";
     }
   }

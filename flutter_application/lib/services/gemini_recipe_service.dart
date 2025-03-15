@@ -1,55 +1,78 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
-import '/database/database_helper.dart'; // Güncel DatabaseHelper'ı buraya import et
+import '../services/supabase_helper.dart'; // Güncellenmiş SupabaseHelper import edildi
 
 class GeminiRecipeService {
-  final String apiKey =
-      "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM"; // Replace with your API Key
+  final String apiKey =  "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM";// API Key buraya eklenecek
   late GenerativeModel model;
 
   GeminiRecipeService() {
     model = GenerativeModel(
-      model: "gemini-1.5-flash", // Ensure you use the correct model
+      model: "gemini-1.5-flash", 
       apiKey: apiKey,
     );
   }
 
-  // Function to get ingredients from the inventory database
+  // 📌 **Supabase'den envanterdeki yiyecekleri al**
   Future<List<String>> getIngredientsFromDatabase() async {
-    // Fetch inventory items from the new database
-    final inventory = await DatabaseHelper().getInventory();
+    try {
+      // Envanterden malzemeleri çek
+      final inventory = await SupabaseHelper().getInventory();
 
-    // Extract food names from the inventory and return them
-    return inventory.map((item) => item['food_name'] as String).toList();
+      // Yalnızca `food_name` değerlerini liste olarak döndür
+      return inventory.map((item) => item['food_name'] as String).toList();
+    } catch (e) {
+      print("❌ Envanter verileri alınırken hata oluştu: $e");
+      return [];
+    }
   }
 
-  // Function to generate a recipe from the ingredients
+  // 📌 **AI ile tarif oluşturma**
   Future<String> generateRecipe(List<String> ingredients) async {
     if (ingredients.isEmpty) {
       return "No ingredients found in the database.";
     }
 
-    // Create the prompt for the Gemini model
-    String prompt = "Generate a recipe using the following ingredients: "
-        "${ingredients.join(', ')}. The recipe should include the ingredients and detailed steps.";
+    // 📝 Gemini'ye gönderilecek prompt
+    String prompt = '''Generate a unique recipe using the following ingredients: 
+        ${ingredients.join(', ')}. 
+        The recipe should include:
+        - A creative recipe name
+        - A list of ingredients
+        - Step-by-step cooking instructions.
+        - Estimated cooking time.
+
+        **Response format:**
+        Recipe Name: (name)
+        Ingredients: (list all ingredients)
+        Steps:
+        1. (Step 1)
+        2. (Step 2)
+        3. ...
+        Estimated Time: (time in minutes)
+
+        Do NOT include extra text, only return the recipe.
+        ''';
 
     try {
-      // Generate the recipe using Gemini
+      // **AI'ye tarif oluşturması için istekte bulun**
       final responses = model.generateContentStream([
         Content.multi([TextPart(prompt)])
       ]);
 
       String aiResponse = '';
       await for (final response in responses) {
-        aiResponse += response.text ?? ''; // Append each response's text
+        aiResponse += response.text ?? '';
       }
 
-      // If there's no response text, return a default message
+      // **Yanıt boşsa hata mesajı döndür**
       if (aiResponse.isEmpty) {
         return "No recipe generated. Please try again.";
       }
 
+      print("✅ AI Generated Recipe: \n$aiResponse");
       return aiResponse;
     } catch (e) {
+      print("❌ Tarif oluşturulurken hata oluştu: $e");
       return "Error generating recipe: $e";
     }
   }

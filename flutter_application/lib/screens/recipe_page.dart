@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '/services/gemini_recipe_service.dart';
 
 class RecipePage extends StatefulWidget {
@@ -11,15 +12,13 @@ class RecipePage extends StatefulWidget {
 class _RecipePageState extends State<RecipePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
   final List<IconData> _icons = [
     Icons.home,
     Icons.camera_alt_outlined,
     Icons.settings,
   ];
 
-  int _currentIndex = 0; // Ensure this is defined
-
+  int _currentIndex = 0;
   String generatedRecipe = "";
   bool isLoading = false;
 
@@ -35,22 +34,41 @@ class _RecipePageState extends State<RecipePage>
     super.dispose();
   }
 
+  // 🔹 Supabase Entegre: Envanterden malzemeleri çek ve AI ile tarif oluştur
   Future<void> fetchGeneratedRecipe() async {
     setState(() {
       isLoading = true;
     });
 
-    // Get food items from the database
-    List<String> ingredients =
-        await GeminiRecipeService().getIngredientsFromDatabase();
+    try {
+      // ✅ Supabase üzerinden inventory tablosundan yiyecekleri çek
+      final supabase = Supabase.instance.client;
+      final response = await supabase.from('inventory').select('food_name');
 
-    // Generate a recipe based on the ingredients
-    String recipe = await GeminiRecipeService().generateRecipe(ingredients);
+      if (response.isEmpty) {
+        setState(() {
+          generatedRecipe = "No ingredients found in the database.";
+          isLoading = false;
+        });
+        return;
+      }
 
-    setState(() {
-      generatedRecipe = recipe;
-      isLoading = false;
-    });
+      // ✅ Çekilen yiyecekleri listeye çevir
+      List<String> ingredients = response.map((item) => item['food_name'] as String).toList();
+
+      // ✅ Gemini API ile tarif oluştur
+      String recipe = await GeminiRecipeService().generateRecipe(ingredients);
+
+      setState(() {
+        generatedRecipe = recipe;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        generatedRecipe = "Error fetching recipe: $e";
+        isLoading = false;
+      });
+    }
   }
 
   @override
@@ -69,7 +87,7 @@ class _RecipePageState extends State<RecipePage>
         title: const Text(
           'Suggested Recipes',
           style: TextStyle(
-            color: Colors.black, // Set text color to black
+            color: Colors.black,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
@@ -79,7 +97,7 @@ class _RecipePageState extends State<RecipePage>
       body: SafeArea(
         child: Column(
           children: [
-            // Title
+            // ✅ Başlık
             const Padding(
               padding: EdgeInsets.all(16),
               child: Align(
@@ -89,41 +107,47 @@ class _RecipePageState extends State<RecipePage>
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black, // Set text color to black
+                    color: Colors.black,
                   ),
                 ),
               ),
             ),
-            // Button to fetch the recipe
+            // ✅ Buton: Tarif Öner
             Padding(
               padding: const EdgeInsets.all(16),
               child: ElevatedButton(
-                onPressed: () {
-                  fetchGeneratedRecipe();
-                },
+                onPressed: fetchGeneratedRecipe,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 15),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
                 child: isLoading
-                    ? CircularProgressIndicator()
-                    : Text(
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text(
                         "Suggest Recipe",
-                        style: TextStyle(
-                            color: Colors.black), // Set button text to black
+                        style: TextStyle(fontSize: 16),
                       ),
               ),
             ),
-            // Display the generated recipe or a placeholder
+            // ✅ Tarif Gösterme Alanı
             Expanded(
               child: isLoading
-                  ? Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator())
                   : SingleChildScrollView(
                       padding: const EdgeInsets.all(16),
                       child: Text(
                         generatedRecipe.isEmpty
                             ? "No recipe generated yet."
                             : generatedRecipe,
-                        style: TextStyle(
-                            fontSize: 16,
-                            height: 1.5,
-                            color: Colors.black), // Set text color to black
+                        style: const TextStyle(
+                          fontSize: 16,
+                          height: 1.5,
+                          color: Colors.black,
+                        ),
                       ),
                     ),
             ),
@@ -134,6 +158,7 @@ class _RecipePageState extends State<RecipePage>
     );
   }
 
+  // ✅ Navigasyon Çubuğu (Alt Menü)
   Widget _buildCurvedNavigationBar() {
     return Container(
       decoration: BoxDecoration(

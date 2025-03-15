@@ -1,33 +1,40 @@
 import 'package:flutter/material.dart';
-import 'package:logging/logging.dart'; // Import logging package
+import 'package:logging/logging.dart'; // Logging paketi
+import 'package:supabase_flutter/supabase_flutter.dart'; // Supabase paketi
 import 'package:flutter_application/screens/onboarding_page.dart';
+import 'package:flutter_application/services/supabase_helper.dart'; // Supabase helper dosyasını içe aktar
 
 void setupLogging() {
-  // Enable hierarchical logging (necessary for modifying non-root loggers)
-  Logger.root.level = Level.ALL; // Set the level for root logger
+  Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
     print('${record.level.name}: ${record.time}: ${record.message}');
   });
 
-  // Example of setting up a non-root logger if needed
   var myLogger = Logger('MyLogger');
   myLogger.info("My custom logger initialized.");
 }
 
-void main() {
-  setupLogging(); // Initialize logging when the app starts
-  runApp(MyApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // Asenkron işlemleri başlatmak için gerekli
+  
+  await SupabaseHelper.initialize(); // SupabaseHelper başlat (bunu ekledik)
+
+  setupLogging(); // Logging başlat
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fridge App',
+      title: 'Fridge Genius',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.orange,
       ),
       home: const OnboardingPage(),
+      debugShowCheckedModeBanner: false, // Debug banner'ı kaldır
     );
   }
 }

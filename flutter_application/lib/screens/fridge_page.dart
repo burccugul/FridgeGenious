@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/database/database_helper.dart';
 import 'package:logging/logging.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 final Logger _logger = Logger('FridgeApp');
 
@@ -56,13 +56,13 @@ class FridgePageState extends State<FridgePage>
     fetchInventory();
   }
 
+  /// ✅ **Supabase'ten envanteri çek**
   Future<void> fetchInventory() async {
     try {
-      DatabaseHelper dbHelper = DatabaseHelper();
-      List<Map<String, dynamic>> inventory = await dbHelper.getInventory();
-
+      final response =
+          await Supabase.instance.client.from('inventory').select();
       setState(() {
-        inventoryItems = inventory.map((item) {
+        inventoryItems = List<Map<String, dynamic>>.from(response).map((item) {
           String foodName = item['food_name'];
           return {
             'name': foodName,
@@ -72,31 +72,36 @@ class FridgePageState extends State<FridgePage>
         }).toList();
       });
     } catch (e) {
-      _logger.severe('Error fetching inventory: $e');
+      _logger.severe('❌ Envanter verileri çekilirken hata oluştu: $e');
     }
   }
 
+  /// ✅ **Supabase ile yeni bir yiyecek ekle**
   Future<void> addFoodToInventory(String foodName) async {
     try {
-      DatabaseHelper dbHelper = DatabaseHelper();
-      // Veritabanında zaten mevcut mu kontrol et
-      bool foodExists = await dbHelper.doesFoodExist(foodName);
+      // Veritabanında zaten var mı kontrol et
+      final response = await Supabase.instance.client
+          .from('inventory')
+          .select()
+          .eq('food_name', foodName)
+          .maybeSingle();
 
-      if (!foodExists) {
-        // Eğer mevcut değilse, veritabanına ekle
-        await dbHelper.insertInventory({
+      if (response == null) {
+        // Eğer yoksa, ekle
+        await Supabase.instance.client.from('inventory').insert({
           'food_name': foodName,
-          'quantity': 1, // varsayılan olarak 1 adet
-          'expiration_date':
-              DateTime.now().toString(), // geçici bir son kullanma tarihi
+          'quantity': 1, // Varsayılan miktar 1
+          'expiration_date': DateTime.now().toIso8601String(), // Geçici SKT
         });
-        fetchInventory(); // En son verileri tekrar al
+
+        fetchInventory(); // Güncellenmiş verileri çek
       }
     } catch (e) {
-      _logger.severe('Error adding food to inventory: $e');
+      _logger.severe('❌ Hata: Yiyecek eklenirken bir hata oluştu: $e');
     }
   }
 
+  /// ✅ **Seçili ürünü aç/kapat**
   void toggleIngredient(int index) {
     setState(() {
       inventoryItems[index]['selected'] = !inventoryItems[index]['selected'];
