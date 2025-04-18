@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application/database/database_helper.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logging/logging.dart';
 
 final Logger _logger = Logger('FridgeApp');
@@ -13,11 +13,13 @@ class FridgePage extends StatefulWidget {
 
 class FridgePageState extends State<FridgePage> {
   List<Map<String, dynamic>> inventoryItems = [];
+  // Get reference to Supabase client
+  final supabase = Supabase.instance.client;
 
   final Map<String, String> emojiMap = {
     'Apple': '🍎',
     'Banana': '🍌',
-    'Grapes': '🍇',
+    'Grape': '🍇',
     'Orange': '🍊',
     'Strawberry': '🍓',
     'Potato': '🥔',
@@ -47,6 +49,19 @@ class FridgePageState extends State<FridgePage> {
     'Chili Pepper': '🌶️',
     'Cucumber': '🥒',
     'Pumpkin': '🎃',
+    'Blueberry': '🫐',
+    'Fig': '🍇',
+    'Apricot': '🍑',
+    'Kiwi': '🥝',
+    'Curry': '🍛',
+    'Hazelnut': '🌰',
+    'Bean': '🫘',
+    'Peanut': '🥜',
+    'Raisin': '🍇',
+    'Juice': '🧃',
+    'Basil': '🌿',
+    'Pepper': '🌶️',
+    'Ginger': '🧄',
   };
 
   @override
@@ -57,11 +72,11 @@ class FridgePageState extends State<FridgePage> {
 
   Future<void> fetchInventory() async {
     try {
-      DatabaseHelper dbHelper = DatabaseHelper();
-      List<Map<String, dynamic>> inventory = await dbHelper.getInventory();
-
+      // Fetch from Supabase 'inventory' table
+      final response = await supabase.from('inventory').select();
+      print(response);
       setState(() {
-        inventoryItems = inventory.map((item) {
+        inventoryItems = (response as List).map((item) {
           String foodName = item['food_name'];
           // Ensure quantity is converted to int
           int quantity = int.tryParse(item['quantity'].toString()) ?? 0;
@@ -80,25 +95,43 @@ class FridgePageState extends State<FridgePage> {
 
   Future<void> updateQuantity(String foodName, int newQuantity) async {
     try {
-      DatabaseHelper dbHelper = DatabaseHelper();
+      final currentUser = supabase.auth.currentUser;
+      final userId = currentUser?.id ?? '1'; // Use '1' if no user is logged in
 
-      // If the quantity is 0 or less, don't delete from inventory
+      // If the user is not logged in, you can handle this scenario
+      //if (userId == null) {
+      // _logger.severe('No user is logged in');
+      // return;
+      // }
+
+      // If the quantity is 0 or less, add to shopping list
       if (newQuantity <= 0) {
-        // Add the item to the shopping list if the quantity reaches 0
-        await dbHelper.insertShoppingList({
+        // Add the item to the shopping list with the user ID
+        await supabase.from('shoppinglist').insert({
           'food_name': foodName,
           'remove_date': DateTime.now()
               .toString(), // Store when it was added to shopping list
+          'userid': userId, // Add the user ID to the shopping list entry
         });
 
         // Update the inventory to set the quantity to 0 instead of deleting it
-        await dbHelper.updateInventoryQuantity(foodName, 0);
+        await supabase
+            .from('inventory')
+            .update({'quantity': 0}).eq('food_name', foodName);
       } else {
         // If the quantity is greater than 0, update the inventory
-        await dbHelper.updateInventoryQuantity(foodName, newQuantity);
+        await supabase
+            .from('inventory')
+            .update({'quantity': newQuantity}).eq('food_name', foodName);
       }
-
-      fetchInventory(); // Refresh the inventory list after update
+      setState(() {
+        // Find the item in the list and update its quantity
+        final index =
+            inventoryItems.indexWhere((item) => item['name'] == foodName);
+        if (index != -1) {
+          inventoryItems[index]['quantity'] = newQuantity;
+        }
+      });
     } catch (e) {
       _logger.severe('Error updating quantity: $e');
     }

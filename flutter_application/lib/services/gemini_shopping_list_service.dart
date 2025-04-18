@@ -1,5 +1,5 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
-import '/database/database_helper.dart';
+import '/database/supabase_helper.dart';
 import 'dart:convert';
 
 class GeminiShoppingListService {
@@ -15,8 +15,10 @@ class GeminiShoppingListService {
 
   // Fetch user shopping habits from the database
   Future<List<Map<String, dynamic>>> getShoppingHistory() async {
-    final inventory = await DatabaseHelper().getInventory();
-    final shoppingList = await DatabaseHelper().getShoppingList();
+    final inventory =
+        await SupabaseHelper().getInventory(); // Updated to SupabaseHelper
+    final shoppingList =
+        await SupabaseHelper().getShoppingList(); // Updated to SupabaseHelper
 
     List<Map<String, dynamic>> history = [];
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application/services/gemini_shopping_list_service.dart'; // Import the service
+import 'package:flutter_application/screens/settings_page.dart';
+import 'package:flutter_application/screens/home_page.dart';
 
 class ShoppingListPage extends StatefulWidget {
   const ShoppingListPage({super.key});
@@ -10,6 +12,12 @@ class ShoppingListPage extends StatefulWidget {
 
 class _ShoppingListPageState extends State<ShoppingListPage>
     with SingleTickerProviderStateMixin {
+  int _currentIndex = 0;
+  final List<IconData> _icons = [
+    Icons.home,
+    Icons.camera_alt_outlined,
+    Icons.settings,
+  ];
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   late GeminiShoppingListService shoppingListService;
@@ -22,12 +30,6 @@ class _ShoppingListPageState extends State<ShoppingListPage>
   };
 
   bool isLoading = false;
-
-  final List<IconData> _icons = [
-    Icons.home,
-    Icons.camera_alt_outlined,
-    Icons.settings,
-  ];
 
   @override
   void initState() {
@@ -223,7 +225,6 @@ class _ShoppingListPageState extends State<ShoppingListPage>
     );
   }
 
-  // Bottom Navigation Bar
   Widget _buildCurvedNavigationBar() {
     return Container(
       decoration: BoxDecoration(
@@ -244,22 +245,37 @@ class _ShoppingListPageState extends State<ShoppingListPage>
             return GestureDetector(
               onTap: () {
                 setState(() {
-                  // Handle tap navigation if needed
+                  _currentIndex = index;
                 });
+
+                if (index == 1) {
+                  final GlobalKey<HomePageState> _homeKey =
+                      GlobalKey<HomePageState>();
+
+                  _homeKey.currentState?.pickImage();
+                } else if (index == 2) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const SettingsPage()),
+                  );
+                }
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 curve: Curves.easeOut,
-                width: 60,
-                height: 60,
+                width: _currentIndex == index ? 60 : 50,
+                height: _currentIndex == index ? 60 : 50,
                 decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 255, 230, 149),
+                  color: _currentIndex == index
+                      ? const Color.fromARGB(255, 255, 230, 149)
+                      : Colors.grey[300],
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   _icons[index],
-                  size: 30,
-                  color: Colors.white,
+                  size: _currentIndex == index ? 30 : 24,
+                  color: _currentIndex == index ? Colors.white : Colors.black54,
                 ),
               ),
             );
@@ -268,4 +284,47 @@ class _ShoppingListPageState extends State<ShoppingListPage>
       ),
     );
   }
+
+  Widget buildCustomButton({
+    required String text,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+    double iconSize = 24,
+    Color textColor = Colors.white,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+        minimumSize: const Size(double.infinity, 60),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+        ),
+      ),
+      icon: Icon(icon, size: iconSize, color: Colors.black),
+      label: Text(text, style: TextStyle(fontSize: 18, color: textColor)),
+    );
+  }
+}
+
+class CurvedPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    var paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    var path = Path();
+    path.moveTo(0, size.height * 0.2);
+    path.quadraticBezierTo(
+        size.width * 0.25, size.height * 0.05, size.width, size.height * 0.15);
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
