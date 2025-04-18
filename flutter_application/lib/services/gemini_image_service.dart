@@ -1,22 +1,44 @@
 import 'dart:io';
 import 'package:google_generative_ai/google_generative_ai.dart';
-import '/database/database_helper.dart'; // Import DatabaseHelper
+import 'package:flutter_application/database/supabase_helper.dart';
+import 'package:logging/logging.dart';
+
+final Logger _logger = Logger('GeminiService');
 
 class GeminiService {
   final String apiKey =
       "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM"; // Replace with your API Key
   late GenerativeModel model;
+  final SupabaseHelper _supabaseHelper = SupabaseHelper();
+
+  // Default user ID - in a real app, this should come from auth
+  final int defaultUserId = 1;
 
   GeminiService() {
     model = GenerativeModel(
-      model: "gemini-2.0-flash", // Ensure you use the correct model
+      model: "gemini-2.0-flash",
       apiKey: apiKey,
     );
+    // Initialize Supabase connection
+    _supabaseHelper.initialize().catchError((error) {
+      _logger.severe('Failed to initialize Supabase: $error');
+    });
   }
 
   // Convert a file to a DataPart
   Future<DataPart> fileToPart(String mimeType, String path) async {
     return DataPart(mimeType, await File(path).readAsBytes());
+  }
+
+  // Get the current user ID from Supabase auth
+  int _getCurrentUserId() {
+    try {
+      final userIdString = _supabaseHelper.client.auth.currentUser?.id;
+      return int.tryParse(userIdString ?? '') ?? defaultUserId;
+    } catch (e) {
+      _logger.warning('Could not get current user ID: $e');
+      return defaultUserId;
+    }
   }
 
   // Function to analyze an image
@@ -33,50 +55,100 @@ class GeminiService {
           Please do not write other things, do not write food names as plural form, write them as singular form.
           ''';
 
+      _logger.info('Sending image to Gemini for analysis');
       final responses = model.generateContentStream([
         Content.multi([TextPart(prompt), imagePart])
       ]);
 
       String aiResponse = '';
       await for (final response in responses) {
-        aiResponse += response.text ?? ''; // Append each response's text
+        aiResponse += response.text ?? '';
       }
 
       if (aiResponse.isEmpty) {
+        _logger.warning('No food items detected in the image');
         return "No food items detected in the image.";
       }
-      print("AI Response: $aiResponse");
+      _logger.info("AI Response: $aiResponse");
+
+      // Ensure Supabase is initialized before proceeding
+      await _supabaseHelper.initialize();
+
+      // Get user ID for database operations
+      final userId = _getCurrentUserId();
+      _logger.info("Using user ID: $userId for database operations");
 
       // Split the response by lines to handle multiple food items
       List<String> foodItems = aiResponse.split('\n');
+      int processedItems = 0;
 
       // Process each food item line
       for (String item in foodItems) {
-        // Split each line by commas
+        if (item.trim().isEmpty) continue;
+
         List<String> itemDetails = item.split(',');
 
-        if (itemDetails.length == 3) {
+        if (itemDetails.length >= 3) {
           String foodName = itemDetails[0].trim(); // Food name
           int quantity = int.tryParse(itemDetails[1].trim()) ?? 1; // Quantity
           String expirationDate = itemDetails[2].trim(); // Expiration Date
 
-          // Output for debugging
-          print("Food Name: $foodName");
-          print("Quantity: $quantity");
-          print("Expiration Date: $expirationDate");
+          _logger.info("Processing: $foodName, $quantity, $expirationDate");
 
-          // Insert the item into the database
-          await DatabaseHelper().insertInventory({
-            'food_name': foodName,
-            'quantity': quantity,
-            'last_image_upload': currentDateTime,
-            'expiration_date': expirationDate,
-          });
+          try {
+            // Check if item already exists in inventory for this user
+            final existingItems = await _supabaseHelper.client
+                .from('inventory')
+                .select()
+                .eq('food_name', foodName)
+                .eq('userid', userId);
+
+            if (existingItems != null && existingItems.isNotEmpty) {
+              // Item exists, update quantity
+              int currentQuantity =
+                  int.tryParse(existingItems[0]['quantity'].toString()) ?? 0;
+              int newQuantity = currentQuantity + quantity;
+
+              await _supabaseHelper.client
+                  .from('inventory')
+                  .update({
+                    'quantity': newQuantity,
+                    'last_image_upload': currentDateTime,
+                    'expiration_date': expirationDate,
+                  })
+                  .eq('food_name', foodName)
+                  .eq('userid', userId);
+
+              _logger.info(
+                  "Updated existing item: $foodName, new quantity: $newQuantity");
+            } else {
+              // Item doesn't exist, insert new item
+              await _supabaseHelper.client.from('inventory').insert({
+                'food_name': foodName,
+                'quantity': quantity,
+                'last_image_upload': currentDateTime,
+                'expiration_date': expirationDate,
+                'userid': userId, // Adding the user ID here
+              });
+
+              _logger.info("Inserted new item: $foodName, quantity: $quantity");
+            }
+            processedItems++;
+          } catch (e) {
+            _logger.severe("Error saving item to database: $e");
+          }
+        } else {
+          _logger.warning("Skipping improperly formatted item: $item");
         }
       }
 
-      return aiResponse;
+      if (processedItems > 0) {
+        return "Successfully processed $processedItems food items.";
+      } else {
+        return "No valid food items were found in the image.";
+      }
     } catch (e) {
+      _logger.severe("Error analyzing image: $e");
       return "Error analyzing image: $e";
     }
   }

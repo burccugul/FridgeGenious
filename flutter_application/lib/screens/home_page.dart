@@ -6,7 +6,7 @@ import 'settings_page.dart';
 import '../services/gemini_image_service.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_application/database/database_helper.dart';
+import 'package:flutter_application/database/supabase_helper.dart'; // Updated import
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -26,8 +26,10 @@ class HomePageState extends State<HomePage> {
   final ImagePicker _picker = ImagePicker();
   File? _image;
   List<Map<String, dynamic>> inventoryItems = [];
+  final SupabaseHelper _supabaseHelper =
+      SupabaseHelper(); // Initialize SupabaseHelper
 
-  Future<void> _pickImage() async {
+  Future<void> pickImage() async {
     final pickedFile = await showDialog<File>(
       context: context,
       builder: (context) {
@@ -89,14 +91,32 @@ class HomePageState extends State<HomePage> {
 
   Future<void> fetchInventory() async {
     try {
-      DatabaseHelper dbHelper = DatabaseHelper();
-      List<Map<String, dynamic>> inventory = await dbHelper.getInventory();
+      // Use SupabaseHelper instead of DatabaseHelper
+      List<Map<String, dynamic>> inventory =
+          await _supabaseHelper.getInventory();
       setState(() {
         inventoryItems = inventory;
       });
     } catch (e) {
       print('Error fetching inventory: $e');
+      // Show a snackbar to inform the user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to fetch inventory data')),
+        );
+      }
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize Supabase connection when the widget is created
+    _supabaseHelper.initialize().then((_) {
+      fetchInventory();
+    }).catchError((error) {
+      print('Failed to initialize Supabase: $error');
+    });
   }
 
   @override
@@ -138,7 +158,7 @@ class HomePageState extends State<HomePage> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
-                      'Let’s manage your fridge!',
+                      "Let's manage your fridge!",
                       style: TextStyle(fontSize: 20, color: Colors.black54),
                     ),
                   ),
@@ -150,7 +170,7 @@ class HomePageState extends State<HomePage> {
                     color: Colors.white,
                     textColor: Colors.black,
                     onPressed: () async {
-                      fetchInventory();
+                      await fetchInventory();
 
                       if (mounted) {
                         Navigator.push(
@@ -224,7 +244,7 @@ class HomePageState extends State<HomePage> {
                 });
 
                 if (index == 1) {
-                  _pickImage();
+                  pickImage();
                 } else if (index == 2) {
                   Navigator.push(
                     context,

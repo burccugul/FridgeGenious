@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import '/services/gemini_recipe_service.dart';
+import 'dart:convert';
+import 'recipe_detail_page.dart';
+import 'package:flutter_application/screens/settings_page.dart';
+import 'package:flutter_application/screens/home_page.dart';
 
 class RecipePage extends StatefulWidget {
   const RecipePage({super.key});
@@ -18,15 +22,21 @@ class _RecipePageState extends State<RecipePage>
     Icons.settings,
   ];
 
-  int _currentIndex = 0; // Ensure this is defined
+  int _currentIndex = 0;
 
-  String generatedRecipe = "";
+  Map<String, dynamic>? generatedRecipe;
+
   bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+
+    // Use Future.delayed to ensure the widget is fully built before fetching
+    Future.delayed(Duration.zero, () {
+      fetchGeneratedRecipe();
+    });
   }
 
   @override
@@ -36,21 +46,40 @@ class _RecipePageState extends State<RecipePage>
   }
 
   Future<void> fetchGeneratedRecipe() async {
-    setState(() {
-      isLoading = true;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+      });
+    }
 
-    // Get food items from the database
-    List<String> ingredients =
-        await GeminiRecipeService().getIngredientsFromDatabase();
+    try {
+      List<String> ingredients =
+          await GeminiRecipeService().getIngredientsFromDatabase();
 
-    // Generate a recipe based on the ingredients
-    String recipe = await GeminiRecipeService().generateRecipe(ingredients);
+      String recipeJson =
+          await GeminiRecipeService().generateRecipe(ingredients);
 
-    setState(() {
-      generatedRecipe = recipe;
-      isLoading = false;
-    });
+      final parsed = jsonDecode(recipeJson);
+
+      if (mounted) {
+        setState(() {
+          generatedRecipe = parsed;
+          isLoading = false;
+        });
+      }
+
+      // Don't automatically navigate to detail page
+      // Let the user view the recipe summary first
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          generatedRecipe = {
+            'error': 'Failed to generate recipe: $e',
+          };
+          isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -58,7 +87,7 @@ class _RecipePageState extends State<RecipePage>
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black),
@@ -69,64 +98,388 @@ class _RecipePageState extends State<RecipePage>
         title: const Text(
           'Suggested Recipes',
           style: TextStyle(
-            color: Colors.black, // Set text color to black
+            color: Colors.black,
             fontSize: 20,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: true,
+        actions: [
+          // Add refresh button to generate new recipes
+          IconButton(
+            icon:
+                const Icon(Icons.refresh, color: Color.fromARGB(255, 0, 0, 0)),
+            onPressed: fetchGeneratedRecipe,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
           children: [
-            // Title
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'Recipes Matching Your Fridge',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black, // Set text color to black
-                  ),
+            // Title with gradient background
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Color.fromARGB(255, 255, 255, 255),
+                    Colors.white,
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
               ),
-            ),
-            // Button to fetch the recipe
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: ElevatedButton(
-                onPressed: () {
-                  fetchGeneratedRecipe();
-                },
-                child: isLoading
-                    ? CircularProgressIndicator()
-                    : Text(
-                        "Suggest Recipe",
-                        style: TextStyle(
-                            color: Colors.black), // Set button text to black
-                      ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Recipes From Your Ingredients',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 3,
+                    width: 100,
+                    decoration: const BoxDecoration(
+                      color: Color.fromARGB(255, 241, 147, 7),
+                      borderRadius: BorderRadius.all(Radius.circular(10)),
+                    ),
+                  ),
+                ],
               ),
             ),
             // Display the generated recipe or a placeholder
             Expanded(
               child: isLoading
-                  ? Center(child: CircularProgressIndicator())
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        generatedRecipe.isEmpty
-                            ? "No recipe generated yet."
-                            : generatedRecipe,
-                        style: TextStyle(
-                            fontSize: 16,
-                            height: 1.5,
-                            color: Colors.black), // Set text color to black
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Color.fromARGB(255, 241, 147, 7),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            "Generating recipe from your ingredients...",
+                            style: TextStyle(fontSize: 16, color: Colors.black),
+                          ),
+                        ],
                       ),
-                    ),
-            ),
+                    )
+                  : generatedRecipe == null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.restaurant,
+                                size: 80,
+                                color: const Color.fromARGB(255, 255, 230, 149),
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                "No recipe available.",
+                                style: TextStyle(
+                                    fontSize: 16, color: Colors.black),
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                "Tap the refresh button to generate a recipe\nbased on your ingredients.",
+                                textAlign: TextAlign.center,
+                                style:
+                                    TextStyle(fontSize: 14, color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        )
+                      : generatedRecipe!.containsKey('error')
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(
+                                    Icons.error_outline,
+                                    size: 60,
+                                    color: Color.fromARGB(255, 241, 147, 7),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    generatedRecipe!['error'],
+                                    style: const TextStyle(
+                                        fontSize: 16, color: Colors.red),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 24),
+                                  ElevatedButton(
+                                    onPressed: fetchGeneratedRecipe,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color.fromARGB(
+                                          255, 241, 147, 7),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 24, vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text("Try Again"),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : SingleChildScrollView(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Recipe Card
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color.fromARGB(
+                                              255, 255, 255, 255),
+                                          blurRadius: 10,
+                                          offset: const Offset(0, 5),
+                                        ),
+                                      ],
+                                      border: Border.all(
+                                        color:
+                                            const Color.fromARGB(255, 0, 0, 0),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Recipe Image
+                                        Stack(
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius:
+                                                  const BorderRadius.only(
+                                                topLeft: Radius.circular(14),
+                                                topRight: Radius.circular(14),
+                                              ),
+                                              child: Container(
+                                                height: 200,
+                                                width: double.infinity,
+                                                color: const Color.fromARGB(
+                                                    255, 175, 175, 172),
+                                                child: const Center(
+                                                  child: Icon(Icons.restaurant,
+                                                      size: 50,
+                                                      color: Colors.grey),
+                                                ),
+                                              ),
+                                            ),
+                                            Positioned(
+                                              top: 10,
+                                              right: 10,
+                                              child: Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: const Color.fromARGB(
+                                                      255, 241, 147, 7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    const Icon(Icons.timer,
+                                                        color: Colors.white,
+                                                        size: 16),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '${generatedRecipe!['time_minutes'] ?? 20} mins',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+
+                                        // Recipe Content
+                                        Padding(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                generatedRecipe![
+                                                        'recipe_name'] ??
+                                                    'Recipe',
+                                                style: const TextStyle(
+                                                  fontSize: 24,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.black,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.all(12),
+                                                decoration: BoxDecoration(
+                                                  color: const Color.fromARGB(
+                                                      255, 255, 255, 255),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    const Row(
+                                                      children: [
+                                                        Icon(
+                                                          Icons.restaurant_menu,
+                                                          color: Color.fromARGB(
+                                                              255, 241, 147, 7),
+                                                          size: 20,
+                                                        ),
+                                                        SizedBox(width: 8),
+                                                        Text(
+                                                          'Ingredients:',
+                                                          style: TextStyle(
+                                                            fontSize: 18,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: Colors.black,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    const SizedBox(height: 8),
+                                                    ...List.generate(
+                                                      (generatedRecipe!['ingredients']
+                                                                      as List)
+                                                                  .length >
+                                                              3
+                                                          ? 3
+                                                          : (generatedRecipe![
+                                                                      'ingredients']
+                                                                  as List)
+                                                              .length,
+                                                      (i) => Padding(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .only(
+                                                                bottom: 4),
+                                                        child: Row(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
+                                                          children: [
+                                                            const Text(
+                                                              '• ',
+                                                              style: TextStyle(
+                                                                fontSize: 16,
+                                                                color: Color
+                                                                    .fromARGB(
+                                                                        255,
+                                                                        241,
+                                                                        147,
+                                                                        7),
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                              ),
+                                                            ),
+                                                            Expanded(
+                                                              child: Text(
+                                                                '${generatedRecipe!['ingredients'][i]}',
+                                                                style:
+                                                                    const TextStyle(
+                                                                        fontSize:
+                                                                            16),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    if ((generatedRecipe![
+                                                                    'ingredients']
+                                                                as List)
+                                                            .length >
+                                                        3)
+                                                      const Text(
+                                                        '... and more',
+                                                        style: TextStyle(
+                                                          fontSize: 14,
+                                                          fontStyle:
+                                                              FontStyle.italic,
+                                                          color: Color.fromARGB(
+                                                              255, 241, 147, 7),
+                                                        ),
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(height: 24),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          RecipeDetailPage(
+                                                              recipe:
+                                                                  generatedRecipe),
+                                                    ),
+                                                  );
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor:
+                                                      const Color.fromARGB(
+                                                          255, 241, 147, 7),
+                                                  foregroundColor: Colors.white,
+                                                  minimumSize: const Size(
+                                                      double.infinity, 50),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12),
+                                                  ),
+                                                  elevation: 3,
+                                                ),
+                                                child: const Text(
+                                                  "View Full Recipe",
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+            )
           ],
         ),
       ),
@@ -156,6 +509,19 @@ class _RecipePageState extends State<RecipePage>
                 setState(() {
                   _currentIndex = index;
                 });
+
+                if (index == 1) {
+                  final GlobalKey<HomePageState> _homeKey =
+                      GlobalKey<HomePageState>();
+
+                  _homeKey.currentState?.pickImage();
+                } else if (index == 2) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const SettingsPage()),
+                  );
+                }
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
@@ -180,4 +546,47 @@ class _RecipePageState extends State<RecipePage>
       ),
     );
   }
+
+  Widget buildCustomButton({
+    required String text,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+    double iconSize = 24,
+    Color textColor = Colors.white,
+  }) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+        minimumSize: const Size(double.infinity, 60),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(30),
+        ),
+      ),
+      icon: Icon(icon, size: iconSize, color: Colors.black),
+      label: Text(text, style: TextStyle(fontSize: 18, color: textColor)),
+    );
+  }
+}
+
+class CurvedPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    var paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    var path = Path();
+    path.moveTo(0, size.height * 0.2);
+    path.quadraticBezierTo(
+        size.width * 0.25, size.height * 0.05, size.width, size.height * 0.15);
+    path.lineTo(size.width, size.height);
+    path.lineTo(0, size.height);
+    path.close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
