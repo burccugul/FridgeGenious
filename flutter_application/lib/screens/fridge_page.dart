@@ -13,7 +13,6 @@ class FridgePage extends StatefulWidget {
 
 class FridgePageState extends State<FridgePage> {
   List<Map<String, dynamic>> inventoryItems = [];
-  // Get reference to Supabase client
   final supabase = Supabase.instance.client;
 
   final Map<String, String> emojiMap = {
@@ -72,13 +71,24 @@ class FridgePageState extends State<FridgePage> {
 
   Future<void> fetchInventory() async {
     try {
-      // Fetch from Supabase 'inventory' table
-      final response = await supabase.from('inventory').select();
-      print(response);
+      final currentUser = supabase.auth.currentUser;
+      final uuidUserId = currentUser?.id;
+
+      if (uuidUserId == null) {
+        _logger.warning('No user is logged in');
+        return;
+      }
+
+      final response = await supabase
+          .from('inventory')
+          .select()
+          .eq('uuid_userid', uuidUserId);
+
+      _logger.info('Inventory response: $response');
+
       setState(() {
         inventoryItems = (response as List).map((item) {
           String foodName = item['food_name'];
-          // Ensure quantity is converted to int
           int quantity = int.tryParse(item['quantity'].toString()) ?? 0;
           return {
             'name': foodName,
@@ -96,36 +106,34 @@ class FridgePageState extends State<FridgePage> {
   Future<void> updateQuantity(String foodName, int newQuantity) async {
     try {
       final currentUser = supabase.auth.currentUser;
-      final userId = currentUser?.id ?? '1'; // Use '1' if no user is logged in
+      final uuidUserId = currentUser?.id;
 
-      // If the user is not logged in, you can handle this scenario
-      //if (userId == null) {
-      // _logger.severe('No user is logged in');
-      // return;
-      // }
+      if (uuidUserId == null) {
+        _logger.warning('No user is logged in');
+        return;
+      }
 
-      // If the quantity is 0 or less, add to shopping list
       if (newQuantity <= 0) {
-        // Add the item to the shopping list with the user ID
         await supabase.from('shoppinglist').insert({
           'food_name': foodName,
-          'remove_date': DateTime.now()
-              .toString(), // Store when it was added to shopping list
-          'userid': userId, // Add the user ID to the shopping list entry
+          'remove_date': DateTime.now().toIso8601String(),
+          'uuid_userid': uuidUserId,
         });
 
-        // Update the inventory to set the quantity to 0 instead of deleting it
         await supabase
             .from('inventory')
-            .update({'quantity': 0}).eq('food_name', foodName);
+            .update({'quantity': 0})
+            .eq('food_name', foodName)
+            .eq('uuid_userid', uuidUserId);
       } else {
-        // If the quantity is greater than 0, update the inventory
         await supabase
             .from('inventory')
-            .update({'quantity': newQuantity}).eq('food_name', foodName);
+            .update({'quantity': newQuantity})
+            .eq('food_name', foodName)
+            .eq('uuid_userid', uuidUserId);
       }
+
       setState(() {
-        // Find the item in the list and update its quantity
         final index =
             inventoryItems.indexWhere((item) => item['name'] == foodName);
         if (index != -1) {

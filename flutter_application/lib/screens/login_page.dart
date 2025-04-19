@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
-import 'home_page.dart';
 import 'package:logger/logger.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'home_page.dart';
 import 'sign_up_page.dart';
 import 'forgot_password_page.dart';
 
@@ -14,18 +16,14 @@ class LoginPage extends StatefulWidget {
 class LoginPageState extends State<LoginPage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  var logger = Logger();
+  final logger = Logger();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          // Yellow background
-          Container(
-            color: const Color(0xFFFFB74D),
-          ),
-          // White curved section
+          Container(color: const Color(0xFFFFB74D)),
           Positioned(
             bottom: 0,
             left: 0,
@@ -36,7 +34,6 @@ class LoginPageState extends State<LoginPage> {
               child: Container(),
             ),
           ),
-          // Main content
           SafeArea(
             child: SingleChildScrollView(
               child: Padding(
@@ -44,7 +41,6 @@ class LoginPageState extends State<LoginPage> {
                 child: Column(
                   children: [
                     const SizedBox(height: 20),
-                    // App Title
                     const Text(
                       'Fridge Genius',
                       style: TextStyle(
@@ -54,7 +50,6 @@ class LoginPageState extends State<LoginPage> {
                       ),
                     ),
                     const SizedBox(height: 40),
-                    // Welcome section
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -79,132 +74,15 @@ class LoginPageState extends State<LoginPage> {
                           ],
                         ),
                         const SizedBox(width: 20),
-                        const Icon(
-                          Icons.fastfood,
-                          size: 38,
-                          color: Colors.black87,
-                        ),
+                        const Icon(Icons.fastfood, size: 38, color: Colors.black87),
                       ],
                     ),
                     const SizedBox(height: 40),
-                    // Input fields
-                    Container(
-                      width: double.infinity,
-                      constraints: const BoxConstraints(maxWidth: 300),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: _nameController,
-                        decoration: const InputDecoration(
-                          hintText: 'Username',
-                          prefixIcon: Icon(Icons.person_outline),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 15),
-                        ),
-                      ),
-                    ),
+                    _buildInputField(_nameController, 'Email', Icons.person_outline),
                     const SizedBox(height: 20),
-                    Container(
-                      width: double.infinity,
-                      constraints: const BoxConstraints(maxWidth: 300),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Color.fromRGBO(0, 0, 0, 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: TextField(
-                        controller: _passwordController,
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          hintText: 'Password',
-                          prefixIcon: Icon(Icons.lock_outline),
-                          border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 15),
-                        ),
-                      ),
-                    ),
+                    _buildInputField(_passwordController, 'Password', Icons.lock_outline, obscureText: true),
                     const SizedBox(height: 20),
-                    // Terms checkbox
-                    // Buttons
-                    Container(
-                      constraints: const BoxConstraints(maxWidth: 300),
-                      child: Column(
-                        children: [
-                          ElevatedButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const HomePage()),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.black,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 15),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              minimumSize: const Size(double.infinity, 50),
-                            ),
-                            child: const Text(
-                              'Sign In',
-                              style: TextStyle(fontSize: 16),
-                            ),
-                          ),
-                          const SizedBox(height: 15),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) => const SignUpPage()),
-                              );
-                            },
-                            child: const Text(
-                              'Sign Up',
-                              style: TextStyle(
-                                color: Colors.black87,
-                              ),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                    builder: (context) =>
-                                        const ForgotPasswordPage()),
-                              );
-                            },
-                            child: const Text(
-                              'Forgot Password?',
-                              style: TextStyle(
-                                color: Colors.black54,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildButtons(context),
                   ],
                 ),
               ),
@@ -214,28 +92,114 @@ class LoginPageState extends State<LoginPage> {
       ),
     );
   }
+
+  Widget _buildInputField(TextEditingController controller, String hint, IconData icon, {bool obscureText = false}) {
+    return Container(
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 300),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(30),
+        boxShadow: const [
+          BoxShadow(
+            color: Color.fromRGBO(0, 0, 0, 0.3),
+            blurRadius: 10,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixIcon: Icon(icon),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildButtons(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 300),
+      child: Column(
+        children: [
+          ElevatedButton(
+            onPressed: () async {
+              final email = _nameController.text.trim();
+              final password = _passwordController.text.trim();
+
+              try {
+                final response = await Supabase.instance.client.auth
+                    .signInWithPassword(email: email, password: password);
+
+                final user = response.user;
+
+                if (user != null) {
+                  logger.i('🔐 Giriş başarılı. Kullanıcı UUID: ${user.id}');
+                  if (!mounted) return;
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomePage()),
+                  );
+                } else {
+                  logger.w('⚠️ Kullanıcı bilgileri hatalı');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('E-posta veya şifre hatalı')),
+                  );
+                }
+              } catch (e) {
+                logger.e('🚫 Giriş hatası: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Giriş başarısız: $e')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 15),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              minimumSize: const Size(double.infinity, 50),
+            ),
+            child: const Text('Sign In', style: TextStyle(fontSize: 16)),
+          ),
+          const SizedBox(height: 15),
+          TextButton(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const SignUpPage()));
+            },
+            child: const Text('Sign Up', style: TextStyle(color: Colors.black87)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const ForgotPasswordPage()));
+            },
+            child: const Text(
+              'Forgot Password?',
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
-// Custom painter for the curved white section
 class CurvedPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    var paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    var path = Path();
+    final paint = Paint()..color = Colors.white..style = PaintingStyle.fill;
+    final path = Path();
     path.moveTo(0, size.height * 0.3);
-    path.quadraticBezierTo(
-      size.width * 0.25,
-      0,
-      size.width,
-      size.height * 0.2,
-    );
+    path.quadraticBezierTo(size.width * 0.25, 0, size.width, size.height * 0.2);
     path.lineTo(size.width, size.height);
     path.lineTo(0, size.height);
     path.close();
-
     canvas.drawPath(path, paint);
   }
 
