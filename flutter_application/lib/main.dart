@@ -20,9 +20,9 @@ void main() async {
   try {
     // Initialize Supabase
     await Supabase.initialize(
-      url: "https://ijbfourugvbpsyymlgid.supabase.co",
+      url: "https://pzelhqrawaevvuqbpjnc.supabase.co",
       anonKey:
-          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlqYmZvdXJ1Z3ZicHN5eW1sZ2lkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ5ODMzODMsImV4cCI6MjA2MDU1OTM4M30.xEwCKGQnyyhYrh157mP85o7JCTwaY09iY8tneOjadag",
+          "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6ZWxocXJhd2FldnZ1cWJwam5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNTc5NjMsImV4cCI6MjA2MDczMzk2M30.LzbdN2MZl-XIxyKQGhmaMCdUf-r41oOkSWCZfwTaSSE",
     );
     logger.info("✅ Supabase successfully initialized!");
   } catch (e) {

@@ -78,28 +78,27 @@ class SupabaseHelper {
     }
   }
 
-  // Add these methods to your SupabaseHelper class
-  Future<List<Map<String, dynamic>>> getInventoryByUserId(int userId) async {
+  // Get inventory by UUID user ID
+  Future<List<Map<String, dynamic>>> getInventoryByUserId(
+      String uuidUserId) async {
     await initialize();
 
     final response =
-        await client.from('inventory').select().eq('userid', userId);
-
-    if (response == null) {
-      return [];
-    }
+        await client.from('inventory').select().eq('uuid_userid', uuidUserId);
 
     return List<Map<String, dynamic>>.from(response);
   }
 
-  Future<List<Map<String, dynamic>>> getShoppingListByUserId(int userId) async {
-    final response =
-        await client.from('shopping_list').select().eq('userid', userId);
+  // Get shopping list by UUID user ID
+  Future<List<Map<String, dynamic>>> getShoppingListByUserId(
+      String uuidUserId) async {
+    await initialize();
 
-    if (response.error != null) {
-      throw response.error!;
-    }
+    final response = await client
+        .from('shoppinglist')
+        .select()
+        .eq('uuid_userid', uuidUserId);
 
-    return List<Map<String, dynamic>>.from(response as List);
+    return List<Map<String, dynamic>>.from(response);
   }
 }

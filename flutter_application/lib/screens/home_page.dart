@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application/screens/fridge_page.dart';
+import 'package:flutter_application/screens/login_page.dart';
 import 'recipe_page.dart';
 import 'shopping_list_page.dart';
 import 'settings_page.dart';
@@ -26,8 +27,7 @@ class HomePageState extends State<HomePage> {
   final ImagePicker _picker = ImagePicker();
   File? _image;
   List<Map<String, dynamic>> inventoryItems = [];
-  final SupabaseHelper _supabaseHelper =
-      SupabaseHelper(); // Initialize SupabaseHelper
+  final SupabaseHelper _supabaseHelper = SupabaseHelper();
 
   Future<void> pickImage() async {
     final pickedFile = await showDialog<File>(
@@ -91,7 +91,6 @@ class HomePageState extends State<HomePage> {
 
   Future<void> fetchInventory() async {
     try {
-      // Use SupabaseHelper instead of DatabaseHelper
       List<Map<String, dynamic>> inventory =
           await _supabaseHelper.getInventory();
       setState(() {
@@ -99,7 +98,6 @@ class HomePageState extends State<HomePage> {
       });
     } catch (e) {
       print('Error fetching inventory: $e');
-      // Show a snackbar to inform the user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to fetch inventory data')),
@@ -111,7 +109,6 @@ class HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    // Initialize Supabase connection when the widget is created
     _supabaseHelper.initialize().then((_) {
       fetchInventory();
     }).catchError((error) {
@@ -122,6 +119,26 @@ class HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFFFB74D),
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.logout, color: Colors.black87),
+            onPressed: () async {
+              await _supabaseHelper.client.auth.signOut();
+              if (mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => LoginPage(),
+                  ),
+                );
+              }
+            },
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           Container(color: const Color(0xFFFFB74D)),
@@ -171,7 +188,6 @@ class HomePageState extends State<HomePage> {
                     textColor: Colors.black,
                     onPressed: () async {
                       await fetchInventory();
-
                       if (mounted) {
                         Navigator.push(
                           context,
