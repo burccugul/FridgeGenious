@@ -1,6 +1,7 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '/database/supabase_helper.dart';
 import 'dart:convert';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class GeminiShoppingListService {
   final String apiKey = "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM";
@@ -13,38 +14,45 @@ class GeminiShoppingListService {
     );
   }
 
-  // Fetch user shopping habits from the database
+  // Kullanıcının veritabanından alışveriş geçmişini al
   Future<List<Map<String, dynamic>>> getShoppingHistory() async {
-    final inventory =
-        await SupabaseHelper().getInventory(); // Updated to SupabaseHelper
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) {
+      throw Exception("No user logged in.");
+    }
+
+    String userUUID = user.id; // Burada UUID alınıyor
+
+    // Kullanıcıya özel verileri çekmek için sorguyu güncelle
+    final inventory = await SupabaseHelper().getInventoryByUserId(userUUID);
     final shoppingList =
-        await SupabaseHelper().getShoppingList(); // Updated to SupabaseHelper
+        await SupabaseHelper().getShoppingListByUserId(userUUID);
 
     List<Map<String, dynamic>> history = [];
 
     for (var item in inventory) {
       String foodName = item['food_name'];
 
-      // Parse last image upload date
+      // Son yükleme tarihini çözümle
       DateTime? lastUpload = DateTime.tryParse(item['last_image_upload'] ?? '');
       if (lastUpload == null) {
-        continue; // Skip this item if the last upload date is invalid
+        continue; // Eğer son yükleme tarihi geçersizse bu öğeyi atla
       }
 
-      // Find corresponding shopping list item to get remove_date
+      // İlgili alışveriş listesi öğesini bul ve remove_date'i al
       var removedItem = shoppingList.firstWhere(
         (s) => s['food_name'] == foodName,
         orElse: () => {},
       );
 
-      // Parse remove date
+      // Remove tarihi çözümle
       DateTime? removeDate =
           DateTime.tryParse(removedItem['remove_date'] ?? '');
       if (removeDate == null) {
-        continue; // Skip this item if the remove date is invalid
+        continue; // Eğer remove tarihi geçersizse bu öğeyi atla
       }
 
-      // Calculate consumption rate
+      // Tüketim oranını hesapla
       history.add({
         'food_name': foodName,
         'last_upload': lastUpload,
@@ -56,6 +64,7 @@ class GeminiShoppingListService {
     return history;
   }
 
+  // Kullanıcı bazlı alışveriş listesi oluştur
   Future<Map<String, List<String>>> generateShoppingList() async {
     final history = await getShoppingHistory();
     if (history.isEmpty) {
@@ -104,10 +113,8 @@ Only include the food names in the lists, no additional text.
       await for (final response in responses) {
         aiResponse += response.text ?? '';
       }
-      print("AI Response : $aiResponse"); // Log the response to the console
 
       if (aiResponse.isEmpty) {
-        print("No response from AI.");
         return {
           "daily": ["No shopping list generated. Try again."],
           "weekly": ["No shopping list generated. Try again."],
@@ -115,18 +122,14 @@ Only include the food names in the lists, no additional text.
         };
       }
 
-      print("AI Response: $aiResponse"); // Log the response to the console
-
       // Try to parse the JSON response
       try {
-        // Extract JSON from the response (in case the AI includes additional text)
         final jsonRegExp = RegExp(r'{[\s\S]*}');
         final match = jsonRegExp.firstMatch(aiResponse);
         final jsonStr = match != null ? match.group(0) : aiResponse;
 
         Map<String, dynamic> parsedJson = json.decode(jsonStr!);
 
-        // Convert to the expected format
         Map<String, List<String>> result = {
           "daily": List<String>.from(parsedJson["daily"] ?? []),
           "weekly": List<String>.from(parsedJson["weekly"] ?? []),
@@ -144,7 +147,6 @@ Only include the food names in the lists, no additional text.
           "monthly": []
         };
 
-        // Simple parsing logic for non-JSON responses
         bool inDaily = false, inWeekly = false, inMonthly = false;
 
         for (String line in aiResponse.split('\n')) {
@@ -194,7 +196,7 @@ Only include the food names in the lists, no additional text.
         return manualParsed;
       }
     } catch (e) {
-      print("Error generating shopping list: $e"); // Log any errors
+      print("Error generating shopping list: $e");
       return {
         "daily": ["Error generating shopping list: $e"],
         "weekly": ["Error generating shopping list: $e"],

@@ -1,55 +1,65 @@
 import 'package:google_generative_ai/google_generative_ai.dart';
-import '/database/supabase_helper.dart'; // SupabaseHelper'ı doğru klasörden import et
+import '/database/supabase_helper.dart';
 import 'dart:convert';
+import 'package:logging/logging.dart';
+
+final Logger _logger = Logger('GeminiRecipeService');
 
 class GeminiRecipeService {
-  final String apiKey =
-      "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM"; // Replace with your API Key
+  final String apiKey = "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM";
   late GenerativeModel model;
   final SupabaseHelper _supabaseHelper = SupabaseHelper();
 
   GeminiRecipeService() {
     model = GenerativeModel(
-      model: "gemini-2.0-flash", // Ensure you use the correct model
+      model: "gemini-2.0-flash",
       apiKey: apiKey,
     );
+    _supabaseHelper.initialize().catchError((error) {
+      _logger.severe('Failed to initialize Supabase: $error');
+    });
   }
-  int _getCurrentUserId() {
+
+  /// ✅ Get current user UUID (string)
+  String? _getCurrentUserUUID() {
     try {
-      final userIdString = _supabaseHelper.client.auth.currentUser?.id;
-      return int.tryParse(userIdString ?? '') ??
-          1; // Default to 1 if parsing fails
+      return _supabaseHelper.client.auth.currentUser?.id;
     } catch (e) {
-      print('Could not get current user ID: $e');
-      return 1; // Default user ID
+      _logger.warning('Could not get current user UUID: $e');
+      return null;
     }
   }
 
   Future<List<String>> getIngredientsFromDatabase() async {
-    // Get current user ID
-    final userId = _getCurrentUserId();
+    final uuid = _getCurrentUserUUID();
+    if (uuid == null) {
+      _logger.warning("No user is logged in.");
+      return [];
+    }
 
-    // Fetch inventory items from Supabase FOR THE SPECIFIC USER
-    final inventory = await _supabaseHelper.getInventoryByUserId(userId);
+    final inventory = await _supabaseHelper.client
+        .from('inventory')
+        .select()
+        .eq('uuid_userid', uuid)
+        .gte('quantity', 1); // Quantity'si 0'dan büyük olanları seçiyoruz.
 
-    // Extract food names from the inventory and return them
-    return inventory.map((item) => item['food_name'] as String).toList();
+    return inventory
+        .map<String>((item) => item['food_name'] as String)
+        .toList();
   }
 
-  // Function to generate a recipe from the ingredients
   Future<String> generateRecipe(List<String> ingredients) async {
     if (ingredients.isEmpty) {
       return "No ingredients found in the database.";
     }
 
-    // Create the prompt for the Gemini model
     String prompt = '''Generate a recipe using the following ingredients: 
-        ${ingredients.join(', ')}. 
-        Don't have to use all of them but recipe's ingredients should be all in this list. 
-        The recipe should include the all ingredients and all detailed steps.
-        Show recipe name, ingredients, and steps in the format: RecipeName, Ingredient1, Ingredient2, ..., Step1, Step2, ..., time.
-        Do not write other things from there. 
-        Respond ONLY in JSON format, like this:
+${ingredients.join(', ')}. 
+Don't have to use all of them but recipe's ingredients should be all in this list. 
+The recipe should include the all ingredients and all detailed steps.
+Show recipe name, ingredients, and steps in the format: RecipeName, Ingredient1, Ingredient2, ..., Step1, Step2, ..., time.
+Do not write other things from there. 
+Respond ONLY in JSON format, like this:
 
 {
   "recipe_name": "Recipe Name",
@@ -57,11 +67,7 @@ class GeminiRecipeService {
   "steps": ["Step 1", "Step 2", "..."],
   "time_minutes": 30
 }
-
-Don't add any text before or after the JSON. Just respond with valid JSON.
-Return the recipe strictly in this JSON format (and nothing else):
-
-        ''';
+''';
 
     try {
       final responses = model.generateContentStream([
@@ -73,11 +79,12 @@ Return the recipe strictly in this JSON format (and nothing else):
         aiResponse += response.text ?? '';
       }
 
-      print("Raw AI JSON Response: $aiResponse");
+      _logger.info("Raw AI JSON Response: $aiResponse");
 
       if (aiResponse.isEmpty) {
         return jsonEncode({"error": "No recipe generated. Please try again."});
       }
+
       try {
         final jsonStart = aiResponse.indexOf('{');
         final jsonEnd = aiResponse.lastIndexOf('}');
@@ -90,11 +97,8 @@ Return the recipe strictly in this JSON format (and nothing else):
         }
 
         final cleanJson = aiResponse.substring(jsonStart, jsonEnd + 1);
-
-        // Validate the JSON structure before returning
         final Map<String, dynamic> recipeJson = jsonDecode(cleanJson);
 
-        // Ensure all required fields exist
         if (!recipeJson.containsKey('recipe_name') ||
             !recipeJson.containsKey('ingredients') ||
             !recipeJson.containsKey('steps') ||
@@ -105,7 +109,6 @@ Return the recipe strictly in this JSON format (and nothing else):
           });
         }
 
-        // Ensure fields are of correct type
         if (recipeJson['ingredients'] is! List ||
             recipeJson['steps'] is! List) {
           return jsonEncode({
@@ -113,7 +116,8 @@ Return the recipe strictly in this JSON format (and nothing else):
             "parsed_response": recipeJson
           });
         }
-        saveRecipeToSupabase(recipeJson);
+
+        await saveRecipeToSupabase(recipeJson);
         return const JsonEncoder.withIndent('  ').convert(recipeJson);
       } catch (jsonError) {
         return jsonEncode({
@@ -128,38 +132,44 @@ Return the recipe strictly in this JSON format (and nothing else):
 
   Future<void> saveRecipeToSupabase(Map<String, dynamic> recipeJson) async {
     try {
-      final recipeName = recipeJson['recipe_name'] ?? "Unnamed Recipe";
-
-      // Make sure we have lists, even if they're empty
-      final List<dynamic> ingredients =
-          recipeJson['ingredients'] is List ? recipeJson['ingredients'] : [];
-
-      final List<dynamic> steps =
-          recipeJson['steps'] is List ? recipeJson['steps'] : [];
-
-      final int time =
-          recipeJson['time_minutes'] is int ? recipeJson['time_minutes'] : 0;
-
-      // Validate that we have sufficient data before saving
-      if (ingredients.isEmpty || steps.isEmpty) {
-        print("Eksik veri: ingredients veya steps boş.");
+      final uuid = _getCurrentUserUUID();
+      if (uuid == null) {
+        _logger.warning("No user logged in - cannot save recipe.");
         return;
       }
 
-      // Insert recipe into Supabase
-      await SupabaseHelper().client.from('recipes').insert({
-        "recipe_name": recipeName,
-        "ingredients": jsonEncode(ingredients),
-        "steps": jsonEncode(steps),
-        "time": time,
-        "is_favorite": false,
-      });
+      final recipeName = recipeJson['recipe_name'] ?? "Unnamed Recipe";
+      final List<dynamic> ingredients =
+          recipeJson['ingredients'] is List ? recipeJson['ingredients'] : [];
+      final int time =
+          recipeJson['time_minutes'] is int ? recipeJson['time_minutes'] : 0;
 
-      print("Tarif başarıyla Supabase'e eklendi.");
+      if (ingredients.isEmpty) {
+        _logger.warning("Eksik veri: ingredients boş.");
+        return;
+      }
+
+      // ✅ Supabase'e her bir içerik için satır ekle
+      for (final ingredient in ingredients) {
+        final data = {
+          "uuid_userid": uuid,
+          "recipe_name": recipeName,
+          "food_name": ingredient,
+          "time": time,
+          "quantity": 1,
+          "is_favorite": false,
+        };
+
+        try {
+          await _supabaseHelper.client.from('recipes').insert(data);
+          _logger.info("Tarif kaydedildi: $data");
+        } catch (e) {
+          _logger.severe("Kayıt eklenemedi: $e");
+        }
+      }
     } catch (e) {
-      print("Tarif eklenirken hata oluştu: $e");
-      // For debugging, print the full details of recipeJson
-      print("recipeJson içeriği: $recipeJson");
+      _logger.severe("Tarif eklenirken genel hata: $e");
+      _logger.severe("recipeJson içeriği: $recipeJson");
     }
   }
 }
