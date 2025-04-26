@@ -109,9 +109,9 @@ class GeminiShoppingListService {
     final history = await getShoppingHistory();
     if (history.isEmpty) {
       return {
-        "daily": ["No consumption data available."],
-        "weekly": ["No consumption data available."],
-        "monthly": ["No consumption data available."]
+        "daily": ["You have no shopping list as daily."],
+        "weekly": ["You have no shopping list as weekly."],
+        "monthly": ["You have no shopping list as monthly."]
       };
     }
 

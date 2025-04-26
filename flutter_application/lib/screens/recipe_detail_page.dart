@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RecipeDetailPage extends StatefulWidget {
   final Map<String, dynamic>? recipe;
@@ -14,6 +15,172 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   bool isIngredientsExpanded = false;
   bool isDirectionsExpanded = true;
   bool isFavorite = false;
+  bool isUpdating = false;
+  final _supabase = Supabase.instance.client;
+  String? effectiveUserID;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize favorite status from recipe data
+    if (widget.recipe != null) {
+      setState(() {
+        isFavorite = widget.recipe!['is_favorite'] ?? false;
+      });
+    }
+    _getEffectiveUserID().then((_) {
+      // Load favorite status after getting effective user ID
+      _loadFavoriteStatus();
+    });
+  }
+
+  // Sayfaya her geri dönüldüğünde çağrılacak
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (effectiveUserID != null && widget.recipe != null) {
+      _loadFavoriteStatus();
+    }
+  }
+
+// Favori durumunu veritabanından yükle
+  Future<void> _loadFavoriteStatus() async {
+    if (effectiveUserID == null || widget.recipe == null) return;
+
+    final recipeName = widget.recipe!['recipe_name'];
+    if (recipeName == null) return;
+
+    try {
+      // Response yapısını anlamak için önce yazdıralım
+      final response = await _supabase
+          .from('recipes')
+          .select('is_favorite')
+          .eq('recipe_name', recipeName)
+          .eq('uuid_userid', effectiveUserID)
+          .limit(1);
+
+      // Response formatını debug amaçlı yazdır
+      print('Response type: ${response.runtimeType}');
+      print('Response data: $response');
+
+      // Doğru şekilde parse et
+      if (response != null) {
+        if (response is List && response.isNotEmpty) {
+          // Liste ise ilk elemanı al
+          setState(() {
+            isFavorite = response[0]['is_favorite'] ?? false;
+          });
+          print('Loaded favorite status from list: $isFavorite');
+        } else if (response is Map) {
+          // Doğrudan bir Map ise
+          setState(() {
+            isFavorite = response['is_favorite'] ?? false;
+          });
+          print('Loaded favorite status from map: $isFavorite');
+        } else {
+          print('Unknown response format: $response');
+        }
+      }
+    } catch (e) {
+      print('Error loading favorite status: $e');
+      print('Stack trace: ${StackTrace.current}');
+    }
+  }
+
+  Future<void> _getEffectiveUserID() async {
+    try {
+      final currentUserID = _supabase.auth.currentUser?.id;
+      final userIDArray = '["$currentUserID"]';
+
+      final familyPackagesResponse = await _supabase
+          .from('family_packages')
+          .select()
+          .or('owner_user_id.eq.$currentUserID,member_user_ids.cs.$userIDArray');
+
+      if (familyPackagesResponse != null && familyPackagesResponse.isNotEmpty) {
+        final familyPackage = familyPackagesResponse[0];
+        setState(() {
+          effectiveUserID = familyPackage['owner_user_id'];
+        });
+        print(
+            'User is part of family package: ${familyPackage['family_name']}');
+        print('Using family owner ID: $effectiveUserID');
+      } else {
+        setState(() {
+          effectiveUserID = currentUserID;
+        });
+        print(
+            'User is not part of any family package, using personal ID: $effectiveUserID');
+      }
+    } catch (e) {
+      print('Error getting effective user ID: $e');
+      setState(() {
+        effectiveUserID = _supabase.auth.currentUser?.id;
+      });
+    }
+  }
+
+  Future<void> toggleFavorite() async {
+    print("Toggle favorite clicked"); // Debug print
+
+    if (widget.recipe == null) return;
+    if (effectiveUserID == null) {
+      print("No effective user ID found");
+      return;
+    }
+
+    final recipeName = widget.recipe!['recipe_name'];
+    if (recipeName == null) return;
+
+    setState(() {
+      isUpdating = true;
+    });
+
+    try {
+      // Toggle favorite status
+      final newFavoriteStatus = !isFavorite;
+
+      // Update in Supabase - hem recipe_name hem de user_id ile eşleştirme yapıyoruz
+      await _supabase
+          .from('recipes')
+          .update({'is_favorite': newFavoriteStatus})
+          .eq('recipe_name', recipeName)
+          .eq('uuid_userid',
+              effectiveUserID); // Efektif kullanıcı kimliğini kullan
+
+      // Update local state if successful
+      setState(() {
+        isFavorite = newFavoriteStatus;
+      });
+
+      // Show confirmation
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(newFavoriteStatus
+              ? 'Added to favorites'
+              : 'Removed from favorites'),
+          backgroundColor: const Color.fromARGB(255, 241, 147, 7),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      // Show error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update favorite status: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      // Revert back if failed
+      setState(() {
+        isFavorite = !isFavorite;
+      });
+    } finally {
+      setState(() {
+        isUpdating = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -76,16 +243,12 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     // Back button
-                    Container(
-                      width: 40,
-                      height: 40,
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back,
-                            color: Color.fromARGB(255, 9, 9, 9), size: 20),
-                        onPressed: () {
-                          Navigator.pop(context);
-                        },
-                      ),
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back,
+                          color: Color.fromARGB(255, 9, 9, 9), size: 20),
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
                     ),
                     // Title
                     const Text(
@@ -95,31 +258,39 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    // Favorite button
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: const Color.fromARGB(255, 255, 255, 255),
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: const Color.fromARGB(255, 0, 0, 0),
-                          width: 2,
+                    // Favorite button - Using GestureDetector instead of Container with IconButton
+                    GestureDetector(
+                      onTap: isUpdating ? null : toggleFavorite,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(255, 255, 255, 255),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: const Color.fromARGB(255, 0, 0, 0),
+                            width: 2,
+                          ),
                         ),
-                      ),
-                      child: IconButton(
-                        icon: Icon(
-                          isFavorite ? Icons.favorite : Icons.favorite_border,
-                          color: isFavorite
-                              ? const Color.fromARGB(255, 241, 147, 7)
-                              : const Color.fromARGB(255, 0, 0, 0),
-                          size: 20,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            isFavorite = !isFavorite;
-                          });
-                        },
+                        child: isUpdating
+                            ? const Padding(
+                                padding: EdgeInsets.all(10.0),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color.fromARGB(255, 241, 147, 7),
+                                  ),
+                                ),
+                              )
+                            : Icon(
+                                isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: isFavorite
+                                    ? const Color.fromARGB(255, 241, 147, 7)
+                                    : const Color.fromARGB(255, 0, 0, 0),
+                                size: 20,
+                              ),
                       ),
                     ),
                   ],
@@ -255,7 +426,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              '${recipe['time_minutes'] ?? 20} mins',
+                              '${recipe['time_minutes'] ?? recipe['time'] ?? 20} mins',
                               style: const TextStyle(
                                 fontSize: 16,
                                 color: Colors.white,

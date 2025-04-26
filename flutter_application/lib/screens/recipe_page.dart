@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'recipe_detail_page.dart';
 import 'package:flutter_application/screens/settings_page.dart';
 import 'package:flutter_application/screens/home_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RecipePage extends StatefulWidget {
   const RecipePage({super.key});
@@ -15,6 +16,8 @@ class RecipePage extends StatefulWidget {
 class _RecipePageState extends State<RecipePage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final _supabase = Supabase.instance.client;
+  String? effectiveUserID;
 
   final List<IconData> _icons = [
     Icons.home,
@@ -23,19 +26,37 @@ class _RecipePageState extends State<RecipePage>
   ];
 
   int _currentIndex = 0;
+  int _currentTabIndex = 0; // Aktif sekme indeksi
 
   Map<String, dynamic>? generatedRecipe;
+  List<Map<String, dynamic>> favoriteRecipes = []; // Favori tarifler listesi
 
   bool isLoading = false;
+  bool isFavoritesLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        setState(() {
+          _currentTabIndex = _tabController.index;
+        });
+
+        // Favoriler sekmesine geçildiğinde favori tarifleri yükle
+        if (_tabController.index == 1) {
+          _loadFavoriteRecipes();
+        }
+      }
+    });
 
     // Use Future.delayed to ensure the widget is fully built before fetching
     Future.delayed(Duration.zero, () {
-      fetchGeneratedRecipe();
+      _getEffectiveUserID().then((_) {
+        fetchGeneratedRecipe();
+        _loadFavoriteRecipes(); // İlk açılışta favori tarifleri de yükle
+      });
     });
   }
 
@@ -43,6 +64,92 @@ class _RecipePageState extends State<RecipePage>
   void dispose() {
     _tabController.dispose();
     super.dispose();
+  }
+
+  // Get the actual user ID to use (considering family package)
+  Future<void> _getEffectiveUserID() async {
+    try {
+      final currentUserID = _supabase.auth.currentUser?.id;
+      final userIDArray = '["$currentUserID"]';
+
+      final familyPackagesResponse = await _supabase
+          .from('family_packages')
+          .select()
+          .or('owner_user_id.eq.$currentUserID,member_user_ids.cs.$userIDArray');
+
+      if (familyPackagesResponse != null && familyPackagesResponse.isNotEmpty) {
+        final familyPackage = familyPackagesResponse[0];
+        setState(() {
+          effectiveUserID = familyPackage['owner_user_id'];
+        });
+        print(
+            'User is part of family package: ${familyPackage['family_name']}');
+        print('Using family owner ID: $effectiveUserID');
+      } else {
+        setState(() {
+          effectiveUserID = currentUserID;
+        });
+        print(
+            'User is not part of any family package, using personal ID: $effectiveUserID');
+      }
+    } catch (e) {
+      print('Error getting effective user ID: $e');
+      setState(() {
+        effectiveUserID = _supabase.auth.currentUser?.id;
+      });
+    }
+  }
+
+  // Favori tarifleri yükle
+// Modify the _loadFavoriteRecipes method in the _RecipePageState class
+
+  Future<void> _loadFavoriteRecipes() async {
+    if (effectiveUserID == null) return;
+
+    setState(() {
+      isFavoritesLoading = true;
+    });
+
+    try {
+      final response = await _supabase
+          .from('recipes')
+          .select()
+          .eq('uuid_userid', effectiveUserID)
+          .eq('is_favorite', true)
+          .order('recipe_name', ascending: true);
+
+      if (response != null) {
+        // Create a map to store unique recipes by name
+        final Map<String, Map<String, dynamic>> uniqueRecipes = {};
+
+        // Process each recipe, keeping only the most recent one with a specific name
+        for (final recipe in List<Map<String, dynamic>>.from(response)) {
+          final recipeName =
+              recipe['recipe_name']?.toString() ?? 'Unnamed Recipe';
+
+          // If this recipe name hasn't been seen or if this is a newer version, save it
+          if (!uniqueRecipes.containsKey(recipeName) ||
+              (recipe['created_at'] != null &&
+                  uniqueRecipes[recipeName]!['created_at'] != null &&
+                  DateTime.parse(recipe['created_at']).isAfter(DateTime.parse(
+                      uniqueRecipes[recipeName]!['created_at'])))) {
+            uniqueRecipes[recipeName] = recipe;
+          }
+        }
+
+        setState(() {
+          // Convert the values from the uniqueRecipes map back to a list
+          favoriteRecipes = uniqueRecipes.values.toList();
+          isFavoritesLoading = false;
+        });
+        print('Loaded ${favoriteRecipes.length} unique favorite recipes');
+      }
+    } catch (e) {
+      print('Error loading favorite recipes: $e');
+      setState(() {
+        isFavoritesLoading = false;
+      });
+    }
   }
 
   Future<void> fetchGeneratedRecipe() async {
@@ -56,6 +163,19 @@ class _RecipePageState extends State<RecipePage>
       List<String> ingredients =
           await GeminiRecipeService().getIngredientsFromDatabase();
 
+      // Check if the ingredients list is empty
+      if (ingredients.isEmpty) {
+        if (mounted) {
+          setState(() {
+            generatedRecipe = {
+              'error': 'No recipe available - inventory is empty.',
+            };
+            isLoading = false;
+          });
+        }
+        return; // Exit the function early if no ingredients
+      }
+
       String recipeJson =
           await GeminiRecipeService().generateRecipe(ingredients);
 
@@ -67,9 +187,6 @@ class _RecipePageState extends State<RecipePage>
           isLoading = false;
         });
       }
-
-      // Don't automatically navigate to detail page
-      // Let the user view the recipe summary first
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -96,7 +213,7 @@ class _RecipePageState extends State<RecipePage>
           },
         ),
         title: const Text(
-          'Suggested Recipes',
+          'Recipes',
           style: TextStyle(
             color: Colors.black,
             fontSize: 20,
@@ -105,130 +222,120 @@ class _RecipePageState extends State<RecipePage>
         ),
         centerTitle: true,
         actions: [
-          // Add refresh button to generate new recipes
-          IconButton(
-            icon:
-                const Icon(Icons.refresh, color: Color.fromARGB(255, 0, 0, 0)),
-            onPressed: fetchGeneratedRecipe,
-          ),
+          // Suggested sekmesindeyken yenileme butonunu göster
+          if (_currentTabIndex == 0)
+            IconButton(
+              icon: const Icon(Icons.refresh,
+                  color: Color.fromARGB(255, 0, 0, 0)),
+              onPressed: fetchGeneratedRecipe,
+            ),
+          // Favorites sekmesindeyken yenileme butonunu göster
+          if (_currentTabIndex == 1)
+            IconButton(
+              icon: const Icon(Icons.refresh,
+                  color: Color.fromARGB(255, 0, 0, 0)),
+              onPressed: _loadFavoriteRecipes,
+            ),
         ],
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: const Color.fromARGB(255, 241, 147, 7),
+          labelColor: Colors.black,
+          tabs: const [
+            Tab(text: 'Suggested'),
+            Tab(text: 'Favorites'),
+          ],
+        ),
       ),
       body: SafeArea(
-        child: Column(
+        child: TabBarView(
+          controller: _tabController,
           children: [
-            // Title with gradient background
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Color.fromARGB(255, 255, 255, 255),
-                    Colors.white,
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Recipes From Your Ingredients',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+            // Suggested Recipes Tab
+            Column(
+              children: [
+                // Title with gradient background
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color.fromARGB(255, 255, 255, 255),
+                        Colors.white,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Container(
-                    height: 3,
-                    width: 100,
-                    decoration: const BoxDecoration(
-                      color: Color.fromARGB(255, 241, 147, 7),
-                      borderRadius: BorderRadius.all(Radius.circular(10)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Display the generated recipe or a placeholder
-            Expanded(
-              child: isLoading
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Color.fromARGB(255, 241, 147, 7),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            "Generating recipe from your ingredients...",
-                            style: TextStyle(fontSize: 16, color: Colors.black),
-                          ),
-                        ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Recipes From Your Ingredients',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
                       ),
-                    )
-                  : generatedRecipe == null
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 3,
+                        width: 100,
+                        decoration: const BoxDecoration(
+                          color: Color.fromARGB(255, 241, 147, 7),
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Display the generated recipe or a placeholder
+                Expanded(
+                  child: isLoading
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.restaurant,
-                                size: 80,
-                                color: const Color.fromARGB(255, 255, 230, 149),
+                              const CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color.fromARGB(255, 241, 147, 7),
+                                ),
                               ),
                               const SizedBox(height: 16),
                               const Text(
-                                "No recipe available.",
+                                "Generating recipe from your ingredients...",
                                 style: TextStyle(
                                     fontSize: 16, color: Colors.black),
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                "Tap the refresh button to generate a recipe\nbased on your ingredients.",
-                                textAlign: TextAlign.center,
-                                style:
-                                    TextStyle(fontSize: 14, color: Colors.grey),
                               ),
                             ],
                           ),
                         )
-                      : generatedRecipe!.containsKey('error')
+                      : generatedRecipe == null ||
+                              generatedRecipe!.containsKey('error')
                           ? Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  const Icon(
-                                    Icons.error_outline,
-                                    size: 60,
-                                    color: Color.fromARGB(255, 241, 147, 7),
+                                  Icon(
+                                    Icons.restaurant,
+                                    size: 80,
+                                    color: const Color.fromARGB(
+                                        255, 255, 230, 149),
                                   ),
                                   const SizedBox(height: 16),
-                                  Text(
-                                    generatedRecipe!['error'],
-                                    style: const TextStyle(
-                                        fontSize: 16, color: Colors.red),
-                                    textAlign: TextAlign.center,
+                                  const Text(
+                                    "No recipe available.",
+                                    style: TextStyle(
+                                        fontSize: 16, color: Colors.black),
                                   ),
-                                  const SizedBox(height: 24),
-                                  ElevatedButton(
-                                    onPressed: fetchGeneratedRecipe,
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color.fromARGB(
-                                          255, 241, 147, 7),
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 24, vertical: 12),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: const Text("Try Again"),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    "Tap the refresh button to generate a recipe\nbased on your ingredients.",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontSize: 14, color: Colors.grey),
                                   ),
                                 ],
                               ),
@@ -316,7 +423,6 @@ class _RecipePageState extends State<RecipePage>
                                             ),
                                           ],
                                         ),
-
                                         // Recipe Content
                                         Padding(
                                           padding: const EdgeInsets.all(16),
@@ -479,7 +585,227 @@ class _RecipePageState extends State<RecipePage>
                                 ],
                               ),
                             ),
-            )
+                )
+              ],
+            ),
+
+            // Favorites Tab (Yeni eklenen sekme)
+            Column(
+              children: [
+                // Title with gradient background
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color.fromARGB(255, 255, 255, 255),
+                        Colors.white,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Your Favorite Recipes',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        height: 3,
+                        width: 100,
+                        decoration: const BoxDecoration(
+                          color: Color.fromARGB(255, 241, 147, 7),
+                          borderRadius: BorderRadius.all(Radius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Favori tarifleri listele
+                Expanded(
+                  child: isFavoritesLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Color.fromARGB(255, 241, 147, 7),
+                            ),
+                          ),
+                        )
+                      : favoriteRecipes.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.favorite_border,
+                                    size: 80,
+                                    color: const Color.fromARGB(
+                                        255, 255, 230, 149),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    "No favorite recipes yet",
+                                    style: TextStyle(
+                                        fontSize: 18, color: Colors.black),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    "Add recipes to your favorites by clicking the heart icon\non the recipe detail page.",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        fontSize: 14, color: Colors.grey),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: favoriteRecipes.length,
+                              itemBuilder: (context, index) {
+                                final recipe = favoriteRecipes[index];
+                                return Card(
+                                  margin: const EdgeInsets.only(bottom: 16),
+                                  elevation: 3,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    side: BorderSide(
+                                      color: Colors.grey.shade300,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: InkWell(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              RecipeDetailPage(recipe: recipe),
+                                        ),
+                                      ).then((_) {
+                                        // Detay sayfasından dönünce favori durumlarını yenile
+                                        _loadFavoriteRecipes();
+                                      });
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        // Recipe Image
+                                        Container(
+                                          height: 120,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade300,
+                                            borderRadius:
+                                                const BorderRadius.only(
+                                              topLeft: Radius.circular(12),
+                                              topRight: Radius.circular(12),
+                                            ),
+                                          ),
+                                          child: Center(
+                                            child: Icon(
+                                              Icons.restaurant,
+                                              size: 40,
+                                              color: Colors.grey.shade500,
+                                            ),
+                                          ),
+                                        ),
+                                        // Recipe Details
+                                        Padding(
+                                          padding: const EdgeInsets.all(12),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      recipe['recipe_name'] ??
+                                                          'Unnamed Recipe',
+                                                      style: const TextStyle(
+                                                        fontSize: 18,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 4),
+                                                    if (recipe[
+                                                                'ingredients'] !=
+                                                            null &&
+                                                        recipe['ingredients']
+                                                            is List &&
+                                                        (recipe['ingredients']
+                                                                as List)
+                                                            .isNotEmpty)
+                                                      Text(
+                                                        'Ingredients: ${(recipe['ingredients'] as List).take(3).join(", ")}${(recipe['ingredients'] as List).length > 3 ? "..." : ""}',
+                                                        style: TextStyle(
+                                                          fontSize: 12,
+                                                          color: Colors
+                                                              .grey.shade600,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow
+                                                            .ellipsis,
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 4,
+                                                ),
+                                                decoration: BoxDecoration(
+                                                  color: const Color.fromARGB(
+                                                      255, 241, 147, 7),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.timer,
+                                                      color: Colors.white,
+                                                      size: 14,
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Text(
+                                                      '${recipe['time_minutes'] ?? 20} min',
+                                                      style: const TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 12,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
