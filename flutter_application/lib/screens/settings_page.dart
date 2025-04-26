@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application/services/family_package_service.dart';
 
 // Enum for text sizes
 enum TextSize { small, medium, large }
@@ -319,6 +320,22 @@ class SettingsPageState extends State<SettingsPage> {
           _buildSection(
             'Account Management',
             [
+              ListTile(
+                title: const Text(
+                  'Create Family Package',
+                  style: TextStyle(color: Colors.black),
+                ),
+                onTap: () {
+                  // Buraya ileride yeni bir sayfa açacağız
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const FamilyPackagePage(),
+                    ),
+                  );
+                },
+                trailing: const Icon(Icons.group_add),
+              ),
               ListTile(
                 title: const Text(
                   'Logout',

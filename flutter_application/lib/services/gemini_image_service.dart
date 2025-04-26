@@ -24,12 +24,37 @@ class GeminiService {
     return DataPart(mimeType, await File(path).readAsBytes());
   }
 
-  String? _getCurrentUserUUID() {
+  // Get the actual user ID to use (considering family package)
+  Future<String?> _getEffectiveUserID() async {
     try {
-      return _supabaseHelper.client.auth.currentUser?.id;
+      // Get current user's ID
+      final currentUserID = _supabaseHelper.client.auth.currentUser?.id;
+      if (currentUserID == null) {
+        _logger.warning('No current user found');
+        return null;
+      }
+
+      // Check if user is part of a family package
+      final userIDArray = '[\"$currentUserID\"]';
+      final familyPackagesResponse = await _supabaseHelper.client
+          .from('family_packages')
+          .select()
+          .or('owner_user_id.eq.$currentUserID,member_user_ids.cs.$userIDArray');
+
+      if (familyPackagesResponse != null && familyPackagesResponse.isNotEmpty) {
+        // User is part of a family package, return the owner's ID
+        final familyPackage = familyPackagesResponse[0];
+        _logger.info(
+            'User is part of family package: ${familyPackage['family_name']}');
+        return familyPackage['owner_user_id'];
+      }
+
+      // User is not part of a family package, return their own ID
+      return currentUserID;
     } catch (e) {
-      _logger.warning('Could not get current user UUID: $e');
-      return null;
+      _logger.warning('Error getting effective user ID: $e');
+      // Fallback to current user
+      return _supabaseHelper.client.auth.currentUser?.id;
     }
   }
 
@@ -65,11 +90,12 @@ class GeminiService {
       _logger.info("AI Response: $aiResponse");
 
       await _supabaseHelper.initialize();
-      final userUUID = _getCurrentUserUUID();
-      if (userUUID == null) {
+      final effectiveUserID = await _getEffectiveUserID();
+      if (effectiveUserID == null) {
         return "No user logged in. Please sign in to continue.";
       }
-      _logger.info("Using user ID: $userUUID for database operations");
+      _logger.info(
+          "Using effective user ID: $effectiveUserID for database operations");
 
       List<String> foodItems = aiResponse.split('\n');
       int processedItems = 0;
@@ -91,7 +117,7 @@ class GeminiService {
               'quantity': quantity,
               'last_image_upload': currentDateTime,
               'expiration_date': expirationDate,
-              'uuid_userid': userUUID,
+              'uuid_userid': effectiveUserID,
             });
 
             _logger.info("✅ Upserted item: $foodName, quantity: $quantity");
