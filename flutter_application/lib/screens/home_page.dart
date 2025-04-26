@@ -28,6 +28,7 @@ class HomePageState extends State<HomePage> {
   File? _image;
   List<Map<String, dynamic>> inventoryItems = [];
   final SupabaseHelper _supabaseHelper = SupabaseHelper();
+  bool _isProcessing = false;
 
   Future<void> pickImage() async {
     final pickedFile = await showDialog<File>(
@@ -65,27 +66,32 @@ class HomePageState extends State<HomePage> {
     if (pickedFile != null) {
       setState(() {
         _image = pickedFile;
+        _isProcessing = true; // Start processing
       });
-    }
 
-    GeminiService geminiService = GeminiService();
-    String aiResponse = await geminiService.analyzeImage(_image!);
+      GeminiService geminiService = GeminiService();
+      String aiResponse = await geminiService.analyzeImage(_image!);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(aiResponse)),
-      );
-    }
+      if (mounted) {
+        setState(() {
+          _isProcessing = false; // End processing
+        });
 
-    await fetchInventory();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(aiResponse)),
+        );
+      }
 
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => FridgePage(),
-        ),
-      );
+      await fetchInventory();
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => FridgePage(),
+          ),
+        );
+      }
     }
   }
 
@@ -118,121 +124,143 @@ class HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFFFB74D),
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.logout, color: Colors.black87),
-            onPressed: () async {
-              await _supabaseHelper.client.auth.signOut();
-              if (mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => LoginPage(),
-                  ),
-                );
-              }
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Container(color: const Color(0xFFFFB74D)),
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: MediaQuery.of(context).size.height * 0.4,
-            child: CustomPaint(
-              painter: CurvedPainter(),
-              child: Container(),
+    return WillPopScope(
+      onWillPop: () async => false, // Geri tuşunu iptal ediyoruz
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false, // <<< BURAYI EKLE
+
+          backgroundColor: const Color(0xFFFFB74D),
+          elevation: 0,
+          actions: [
+            IconButton(
+              icon: Icon(Icons.logout, color: Colors.black87),
+              onPressed: () async {
+                await _supabaseHelper.client.auth.signOut();
+                if (mounted) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => LoginPage(),
+                    ),
+                  );
+                }
+              },
             ),
-          ),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 20),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Hey, Admin',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      "Let's manage your fridge!",
-                      style: TextStyle(fontSize: 20, color: Colors.black54),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  _buildCustomButton(
-                    text: "What's Inside My Fridge",
-                    icon: Icons.kitchen,
-                    iconSize: 90,
-                    color: Colors.white,
-                    textColor: Colors.black,
-                    onPressed: () async {
-                      await fetchInventory();
-                      if (mounted) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => FridgePage(),
-                          ),
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 70),
-                  _buildCustomButton(
-                    text: "Suggest Recipe",
-                    icon: Icons.book,
-                    iconSize: 40,
-                    color: const Color.fromARGB(255, 241, 147, 7),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const RecipePage()),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  _buildCustomButton(
-                    text: "Suggest Shopping List",
-                    icon: Icons.shopping_cart,
-                    iconSize: 40,
-                    color: const Color.fromARGB(255, 241, 147, 7),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const ShoppingListPage()),
-                      );
-                    },
-                  ),
-                ],
+          ],
+        ),
+        body: Stack(
+          children: [
+            Container(color: const Color(0xFFFFB74D)),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: MediaQuery.of(context).size.height * 0.4,
+              child: CustomPaint(
+                painter: CurvedPainter(),
+                child: Container(),
               ),
             ),
-          ),
-        ],
+            SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SizedBox(height: 20),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Hey, Admin',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        "Let's manage your fridge!",
+                        style: TextStyle(fontSize: 20, color: Colors.black54),
+                      ),
+                    ),
+                    const SizedBox(height: 40),
+                    if (_isProcessing)
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            CircularProgressIndicator(),
+                            SizedBox(height: 20),
+                            Text("Processing image..."),
+                          ],
+                        ),
+                      )
+                    else
+                      Column(
+                        children: [
+                          _buildCustomButton(
+                            text: "What's Inside My Fridge",
+                            icon: Icons.kitchen,
+                            iconSize: 90,
+                            color: Colors.white,
+                            textColor: Colors.black,
+                            onPressed: () async {
+                              await fetchInventory();
+                              if (mounted) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => FridgePage(),
+                                  ),
+                                );
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 70),
+                          _buildCustomButton(
+                            text: "Suggest Recipe",
+                            icon: Icons.book,
+                            iconSize: 40,
+                            color: const Color.fromARGB(255, 241, 147, 7),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => const RecipePage()),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 20),
+                          _buildCustomButton(
+                            text: "Suggest Shopping List",
+                            icon: Icons.shopping_cart,
+                            iconSize: 40,
+                            color: const Color.fromARGB(255, 241, 147, 7),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) =>
+                                        const ShoppingListPage()),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: _buildCurvedNavigationBar(),
       ),
-      bottomNavigationBar: _buildCurvedNavigationBar(),
     );
   }
 

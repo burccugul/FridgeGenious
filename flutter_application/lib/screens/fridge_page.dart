@@ -15,6 +15,7 @@ class FridgePageState extends State<FridgePage> {
   List<Map<String, dynamic>> inventoryItems = [];
   final supabase = Supabase.instance.client;
   String? effectiveUserID;
+  bool isLoading = true; // Veri yükleniyor mu kontrolü
 
   final Map<String, String> emojiMap = {
     'Apple': '🍎',
@@ -73,7 +74,6 @@ class FridgePageState extends State<FridgePage> {
   // Get the actual user ID to use (considering family package)
   Future<void> _getEffectiveUserID() async {
     try {
-      // Get current user's ID
       final currentUserID = supabase.auth.currentUser?.id;
       final userIDArray = '["$currentUserID"]';
 
@@ -83,7 +83,6 @@ class FridgePageState extends State<FridgePage> {
           .or('owner_user_id.eq.$currentUserID,member_user_ids.cs.$userIDArray');
 
       if (familyPackagesResponse != null && familyPackagesResponse.isNotEmpty) {
-        // User is part of a family package, use the owner's ID
         final familyPackage = familyPackagesResponse[0];
         setState(() {
           effectiveUserID = familyPackage['owner_user_id'];
@@ -92,7 +91,6 @@ class FridgePageState extends State<FridgePage> {
             'User is part of family package: ${familyPackage['family_name']}');
         _logger.info('Using family owner ID: $effectiveUserID');
       } else {
-        // User is not part of a family package, use their own ID
         setState(() {
           effectiveUserID = currentUserID;
         });
@@ -101,7 +99,6 @@ class FridgePageState extends State<FridgePage> {
       }
     } catch (e) {
       _logger.warning('Error getting effective user ID: $e');
-      // Fallback to current user
       setState(() {
         effectiveUserID = supabase.auth.currentUser?.id;
       });
@@ -133,6 +130,7 @@ class FridgePageState extends State<FridgePage> {
             'selected': false,
           };
         }).toList();
+        isLoading = false; // Veriler yüklendi
       });
     } catch (e) {
       _logger.severe('Error fetching inventory: $e');
@@ -190,69 +188,74 @@ class FridgePageState extends State<FridgePage> {
       appBar: AppBar(
         title: const Text("What's In Your Fridge"),
       ),
-      body: inventoryItems.isEmpty
+      body: isLoading // Eğer veri yükleniyorsa, yükleme göstergesi
           ? const Center(child: CircularProgressIndicator())
-          : GridView.builder(
-              padding: const EdgeInsets.all(16.0),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-              ),
-              itemCount: inventoryItems.length,
-              itemBuilder: (context, index) {
-                final ingredient = inventoryItems[index];
-                return GestureDetector(
-                  onTap: () => toggleIngredient(index),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: ingredient['selected']
-                            ? Colors.blue
-                            : Colors.blue[100]!,
-                        width: ingredient['selected'] ? 2 : 1,
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(ingredient['emoji'],
-                            style: const TextStyle(fontSize: 40)),
-                        const SizedBox(height: 8),
-                        Text(ingredient['name'],
-                            style: const TextStyle(fontSize: 16)),
-                        const SizedBox(height: 8),
-                        Row(
+          : inventoryItems.isEmpty // Eğer veri yüklendi ama boşsa
+              ? const Center(child: Text('You have no items in your fridge.'))
+              : GridView.builder(
+                  padding: const EdgeInsets.all(16.0),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                  ),
+                  itemCount: inventoryItems.length,
+                  itemBuilder: (context, index) {
+                    final ingredient = inventoryItems[index];
+                    return GestureDetector(
+                      onTap: () => toggleIngredient(index),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: ingredient['selected']
+                                ? Colors.blue
+                                : Colors.blue[100]!,
+                            width: ingredient['selected'] ? 2 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            IconButton(
-                              icon: const Icon(Icons.remove),
-                              onPressed: () {
-                                if (ingredient['quantity'] > 0) {
-                                  int newQuantity = ingredient['quantity'] - 1;
-                                  updateQuantity(
-                                      ingredient['name'], newQuantity);
-                                }
-                              },
-                            ),
-                            Text('${ingredient['quantity']}',
+                            Text(ingredient['emoji'],
+                                style: const TextStyle(fontSize: 40)),
+                            const SizedBox(height: 8),
+                            Text(ingredient['name'],
                                 style: const TextStyle(fontSize: 16)),
-                            IconButton(
-                              icon: const Icon(Icons.add),
-                              onPressed: () {
-                                int newQuantity = ingredient['quantity'] + 1;
-                                updateQuantity(ingredient['name'], newQuantity);
-                              },
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.remove),
+                                  onPressed: () {
+                                    if (ingredient['quantity'] > 0) {
+                                      int newQuantity =
+                                          ingredient['quantity'] - 1;
+                                      updateQuantity(
+                                          ingredient['name'], newQuantity);
+                                    }
+                                  },
+                                ),
+                                Text('${ingredient['quantity']}',
+                                    style: const TextStyle(fontSize: 16)),
+                                IconButton(
+                                  icon: const Icon(Icons.add),
+                                  onPressed: () {
+                                    int newQuantity =
+                                        ingredient['quantity'] + 1;
+                                    updateQuantity(
+                                        ingredient['name'], newQuantity);
+                                  },
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }
