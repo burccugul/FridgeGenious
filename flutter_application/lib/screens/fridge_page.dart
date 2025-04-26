@@ -14,6 +14,7 @@ class FridgePage extends StatefulWidget {
 class FridgePageState extends State<FridgePage> {
   List<Map<String, dynamic>> inventoryItems = [];
   final supabase = Supabase.instance.client;
+  String? effectiveUserID;
 
   final Map<String, String> emojiMap = {
     'Apple': '🍎',
@@ -66,15 +67,50 @@ class FridgePageState extends State<FridgePage> {
   @override
   void initState() {
     super.initState();
-    fetchInventory();
+    _getEffectiveUserID().then((_) => fetchInventory());
+  }
+
+  // Get the actual user ID to use (considering family package)
+  Future<void> _getEffectiveUserID() async {
+    try {
+      // Get current user's ID
+      final currentUserID = supabase.auth.currentUser?.id;
+      final userIDArray = '["$currentUserID"]';
+
+      final familyPackagesResponse = await supabase
+          .from('family_packages')
+          .select()
+          .or('owner_user_id.eq.$currentUserID,member_user_ids.cs.$userIDArray');
+
+      if (familyPackagesResponse != null && familyPackagesResponse.isNotEmpty) {
+        // User is part of a family package, use the owner's ID
+        final familyPackage = familyPackagesResponse[0];
+        setState(() {
+          effectiveUserID = familyPackage['owner_user_id'];
+        });
+        _logger.info(
+            'User is part of family package: ${familyPackage['family_name']}');
+        _logger.info('Using family owner ID: $effectiveUserID');
+      } else {
+        // User is not part of a family package, use their own ID
+        setState(() {
+          effectiveUserID = currentUserID;
+        });
+        _logger.info(
+            'User is not part of any family package, using personal ID: $effectiveUserID');
+      }
+    } catch (e) {
+      _logger.warning('Error getting effective user ID: $e');
+      // Fallback to current user
+      setState(() {
+        effectiveUserID = supabase.auth.currentUser?.id;
+      });
+    }
   }
 
   Future<void> fetchInventory() async {
     try {
-      final currentUser = supabase.auth.currentUser;
-      final uuidUserId = currentUser?.id;
-
-      if (uuidUserId == null) {
+      if (effectiveUserID == null) {
         _logger.warning('No user is logged in');
         return;
       }
@@ -82,7 +118,7 @@ class FridgePageState extends State<FridgePage> {
       final response = await supabase
           .from('inventory')
           .select()
-          .eq('uuid_userid', uuidUserId);
+          .eq('uuid_userid', effectiveUserID);
 
       _logger.info('Inventory response: $response');
 
@@ -105,10 +141,7 @@ class FridgePageState extends State<FridgePage> {
 
   Future<void> updateQuantity(String foodName, int newQuantity) async {
     try {
-      final currentUser = supabase.auth.currentUser;
-      final uuidUserId = currentUser?.id;
-
-      if (uuidUserId == null) {
+      if (effectiveUserID == null) {
         _logger.warning('No user is logged in');
         return;
       }
@@ -117,20 +150,20 @@ class FridgePageState extends State<FridgePage> {
         await supabase.from('shoppinglist').insert({
           'food_name': foodName,
           'remove_date': DateTime.now().toIso8601String(),
-          'uuid_userid': uuidUserId,
+          'uuid_userid': effectiveUserID,
         });
 
         await supabase
             .from('inventory')
             .update({'quantity': 0})
             .eq('food_name', foodName)
-            .eq('uuid_userid', uuidUserId);
+            .eq('uuid_userid', effectiveUserID);
       } else {
         await supabase
             .from('inventory')
             .update({'quantity': newQuantity})
             .eq('food_name', foodName)
-            .eq('uuid_userid', uuidUserId);
+            .eq('uuid_userid', effectiveUserID);
       }
 
       setState(() {

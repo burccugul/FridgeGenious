@@ -2,57 +2,97 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import '/database/supabase_helper.dart';
 import 'dart:convert';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:logging/logging.dart';
+
+final Logger _logger = Logger('GeminiShoppingListService');
 
 class GeminiShoppingListService {
   final String apiKey = "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM";
   late GenerativeModel model;
+  final SupabaseHelper _supabaseHelper = SupabaseHelper();
 
   GeminiShoppingListService() {
     model = GenerativeModel(
       model: "gemini-2.0-flash",
       apiKey: apiKey,
     );
+    _supabaseHelper.initialize().catchError((error) {
+      _logger.severe('Failed to initialize Supabase: $error');
+    });
   }
 
-  // Kullanıcının veritabanından alışveriş geçmişini al
+  /// Get the actual user ID to use (considering family package)
+  Future<String?> _getEffectiveUserID() async {
+    try {
+      // Get current user's ID
+      final currentUserID = Supabase.instance.client.auth.currentUser?.id;
+      if (currentUserID == null) {
+        _logger.warning('No current user found');
+        return null;
+      }
+
+      // Check if user is part of a family package
+      final userIDArray = '[\"$currentUserID\"]';
+      final familyPackagesResponse = await _supabaseHelper.client
+          .from('family_packages')
+          .select()
+          .or('owner_user_id.eq.$currentUserID,member_user_ids.cs.$userIDArray');
+
+      if (familyPackagesResponse != null && familyPackagesResponse.isNotEmpty) {
+        // User is part of a family package, return the owner's ID
+        final familyPackage = familyPackagesResponse[0];
+        _logger.info(
+            'User is part of family package: ${familyPackage['family_name']}');
+        return familyPackage['owner_user_id'];
+      }
+
+      // User is not part of a family package, return their own ID
+      return currentUserID;
+    } catch (e) {
+      _logger.warning('Error getting effective user ID: $e');
+      // Fallback to current user
+      return Supabase.instance.client.auth.currentUser?.id;
+    }
+  }
+
+  // Get the user's shopping history
   Future<List<Map<String, dynamic>>> getShoppingHistory() async {
-    final user = Supabase.instance.client.auth.currentUser;
-    if (user == null) {
+    final effectiveUserID = await _getEffectiveUserID();
+    if (effectiveUserID == null) {
       throw Exception("No user logged in.");
     }
 
-    String userUUID = user.id; // Burada UUID alınıyor
-
-    // Kullanıcıya özel verileri çekmek için sorguyu güncelle
-    final inventory = await SupabaseHelper().getInventoryByUserId(userUUID);
+    // Get data specific to the effective user ID
+    final inventory =
+        await _supabaseHelper.getInventoryByUserId(effectiveUserID);
     final shoppingList =
-        await SupabaseHelper().getShoppingListByUserId(userUUID);
+        await _supabaseHelper.getShoppingListByUserId(effectiveUserID);
 
     List<Map<String, dynamic>> history = [];
 
     for (var item in inventory) {
       String foodName = item['food_name'];
 
-      // Son yükleme tarihini çözümle
+      // Parse last upload date
       DateTime? lastUpload = DateTime.tryParse(item['last_image_upload'] ?? '');
       if (lastUpload == null) {
-        continue; // Eğer son yükleme tarihi geçersizse bu öğeyi atla
+        continue; // Skip if last upload date is invalid
       }
 
-      // İlgili alışveriş listesi öğesini bul ve remove_date'i al
+      // Find the related shopping list item and get remove_date
       var removedItem = shoppingList.firstWhere(
         (s) => s['food_name'] == foodName,
         orElse: () => {},
       );
 
-      // Remove tarihi çözümle
+      // Parse remove date
       DateTime? removeDate =
           DateTime.tryParse(removedItem['remove_date'] ?? '');
       if (removeDate == null) {
-        continue; // Eğer remove tarihi geçersizse bu öğeyi atla
+        continue; // Skip if remove date is invalid
       }
 
-      // Tüketim oranını hesapla
+      // Calculate consumption rate
       history.add({
         'food_name': foodName,
         'last_upload': lastUpload,
@@ -64,7 +104,7 @@ class GeminiShoppingListService {
     return history;
   }
 
-  // Kullanıcı bazlı alışveriş listesi oluştur
+  // Generate user-specific shopping list
   Future<Map<String, List<String>>> generateShoppingList() async {
     final history = await getShoppingHistory();
     if (history.isEmpty) {
@@ -138,7 +178,7 @@ Only include the food names in the lists, no additional text.
 
         return result;
       } catch (e) {
-        print("Error parsing JSON response: $e");
+        _logger.severe("Error parsing JSON response: $e");
 
         // Fallback: try to parse the response manually
         Map<String, List<String>> manualParsed = {
@@ -196,7 +236,7 @@ Only include the food names in the lists, no additional text.
         return manualParsed;
       }
     } catch (e) {
-      print("Error generating shopping list: $e");
+      _logger.severe("Error generating shopping list: $e");
       return {
         "daily": ["Error generating shopping list: $e"],
         "weekly": ["Error generating shopping list: $e"],
