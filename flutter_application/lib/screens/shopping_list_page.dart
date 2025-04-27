@@ -47,6 +47,16 @@ class _ShoppingListPageState extends State<ShoppingListPage>
     _searchController.dispose();
     super.dispose();
   }
+  void addItem(String category, String newItem) {
+  setState(() {
+    // "You have no shopping list..." mesajını sil
+    shoppingLists[category]?.removeWhere((item) => item.startsWith("You have no shopping list"));
+
+    // Yeni ürünü ekle
+    shoppingLists[category]?.add(newItem);
+  });
+}
+
 
   // Fetch and generate shopping list using Gemini AI
   Future<void> generateShoppingList() async {
@@ -58,7 +68,7 @@ class _ShoppingListPageState extends State<ShoppingListPage>
       // Get a single response with all categories
       Map<String, List<String>> response =
           await shoppingListService.generateShoppingList();
-
+          print("Gelen response: $response");
       setState(() {
         shoppingLists = response;
         isLoading = false;
@@ -75,6 +85,45 @@ class _ShoppingListPageState extends State<ShoppingListPage>
       });
     }
   }
+
+void _showAddItemDialog(String category) {
+  final TextEditingController _itemController = TextEditingController();
+
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        title: Text('Add Item to $category list'),
+        content: TextField(
+          controller: _itemController,
+          decoration: InputDecoration(hintText: 'Enter item name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+            },
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              String newItem = _itemController.text.trim();
+              if (newItem.isNotEmpty) {
+                addItem(category, newItem); // Yeni öğe ekleme
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 241, 147, 7),
+            ),
+            child: Text('Add'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 
   @override
   Widget build(BuildContext context) {
@@ -183,48 +232,90 @@ class _ShoppingListPageState extends State<ShoppingListPage>
     );
   }
 
-  // Build shopping list view
-  Widget _buildShoppingListView(List<String> items, String category) {
-    if (items.isEmpty) {
-      return Center(
-        child: Text(
-          "No items found for $category shopping list",
-          style: TextStyle(color: Colors.white, fontSize: 16),
-        ),
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      margin: const EdgeInsets.all(16),
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          String item = items[index].trim();
-          return ListTile(
-            leading: const Icon(Icons.shopping_basket,
-                color: Color.fromARGB(255, 241, 147, 7)),
-            title: Text(item),
-            trailing: IconButton(
-              icon: const Icon(Icons.add_circle_outline,
-                  color: Color.fromARGB(255, 241, 147, 7)),
-              onPressed: () {
-                // Add to cart functionality
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Added $item to cart')),
-                );
-              },
-            ),
-          );
-        },
+Widget _buildShoppingListView(List<String> items, String category) {
+  if (items.isEmpty) {
+    return Center(
+      child: Text(
+        "No items found for $category shopping list",
+        style: TextStyle(color: Colors.white, fontSize: 16),
       ),
     );
   }
 
+  return Container(
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    margin: const EdgeInsets.all(16),
+    child: Column(
+      children: [
+        const SizedBox(height: 10),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            ElevatedButton.icon(
+              onPressed: () => _showAddItemDialog(category),
+              icon: const Icon(Icons.add),
+              label: const Text('Add Item'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 241, 147, 7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: isLoading ? null : generateShoppingList,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Generate'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color.fromARGB(255, 241, 147, 7),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              String item = items[index].trim();
+              return ListTile(
+                leading: const Icon(Icons.shopping_basket,
+                    color: Color.fromARGB(255, 241, 147, 7)),
+                title: Text(item),
+                trailing: IconButton(
+                  icon: const Icon(Icons.add_circle_outline,
+                      color: Color.fromARGB(255, 241, 147, 7)),
+                  onPressed: () {
+                    setState(() {
+                      shoppingLists[category]?.remove(item);
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Removed "$item"')),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+
+
+
+   
   Widget _buildCurvedNavigationBar() {
     return Container(
       decoration: BoxDecoration(
