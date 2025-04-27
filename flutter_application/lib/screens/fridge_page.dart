@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logging/logging.dart';
+import 'package:intl/intl.dart'; // Add this import for date formatting
 
 final Logger _logger = Logger('FridgeApp');
 
@@ -16,6 +17,9 @@ class FridgePageState extends State<FridgePage> {
   final supabase = Supabase.instance.client;
   String? effectiveUserID;
   bool isLoading = true; // Veri yükleniyor mu kontrolü
+  TextEditingController foodController = TextEditingController();
+  TextEditingController quantityController = TextEditingController();
+  DateTime? selectedExpirationDate;
 
   final Map<String, String> emojiMap = {
     'Apple': '🍎',
@@ -71,6 +75,54 @@ class FridgePageState extends State<FridgePage> {
     _getEffectiveUserID().then((_) => fetchInventory());
   }
 
+
+  // Yeni öğe ekleme fonksiyonu
+  Future<void> addItemToInventory() async {
+    final foodName = foodController.text.trim();
+    final quantity = int.tryParse(quantityController.text) ?? 1;
+    final expirationDate = selectedExpirationDate;
+
+    if (foodName.isEmpty || expirationDate == null) {
+      _logger.warning("Food name or expiration date cannot be empty!");
+      return;
+    }
+
+    try {
+      if (effectiveUserID == null) {
+        _logger.warning('No user is logged in');
+        return;
+      }
+
+      final response = await supabase.from('inventory').insert([
+        {
+          'food_name': foodName,
+          'quantity': quantity,
+          'expiration_date': expirationDate.toIso8601String(),
+          'uuid_userid': effectiveUserID,
+        }
+      ]);
+
+      if (response != null) {
+        _logger.info('Item added to inventory: $foodName');
+        fetchInventory();  // Envanteri güncelle
+      }
+    } catch (e) {
+      _logger.severe('Error adding item: $e');
+    }
+  }
+   Future<void> _selectExpirationDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2101),
+    );
+
+    if (picked != null && picked != selectedExpirationDate)
+      setState(() {
+        selectedExpirationDate = picked;
+      });
+  }
   // Get the actual user ID to use (considering family package)
   Future<void> _getEffectiveUserID() async {
     try {
@@ -143,6 +195,14 @@ class FridgePageState extends State<FridgePage> {
         _logger.warning('No user is logged in');
         return;
       }
+      // UI'yi hemen güncelle
+    setState(() {
+      final index = inventoryItems.indexWhere((item) => item['name'] == foodName);
+      if (index != -1) {
+        inventoryItems[index]['quantity'] = newQuantity;
+      }
+    });
+
 
       if (newQuantity <= 0) {
         await supabase.from('shoppinglist').insert({
@@ -183,79 +243,160 @@ class FridgePageState extends State<FridgePage> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("What's In Your Fridge"),
-      ),
-      body: isLoading // Eğer veri yükleniyorsa, yükleme göstergesi
-          ? const Center(child: CircularProgressIndicator())
-          : inventoryItems.isEmpty // Eğer veri yüklendi ama boşsa
-              ? const Center(child: Text('You have no items in your fridge.'))
-              : GridView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: inventoryItems.length,
-                  itemBuilder: (context, index) {
-                    final ingredient = inventoryItems[index];
-                    return GestureDetector(
-                      onTap: () => toggleIngredient(index),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: ingredient['selected']
-                                ? Colors.blue
-                                : Colors.blue[100]!,
-                            width: ingredient['selected'] ? 2 : 1,
-                          ),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(ingredient['emoji'],
-                                style: const TextStyle(fontSize: 40)),
-                            const SizedBox(height: 8),
-                            Text(ingredient['name'],
-                                style: const TextStyle(fontSize: 16)),
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.remove),
-                                  onPressed: () {
-                                    if (ingredient['quantity'] > 0) {
-                                      int newQuantity =
-                                          ingredient['quantity'] - 1;
-                                      updateQuantity(
-                                          ingredient['name'], newQuantity);
-                                    }
-                                  },
-                                ),
-                                Text('${ingredient['quantity']}',
-                                    style: const TextStyle(fontSize: 16)),
-                                IconButton(
-                                  icon: const Icon(Icons.add),
-                                  onPressed: () {
-                                    int newQuantity =
-                                        ingredient['quantity'] + 1;
-                                    updateQuantity(
-                                        ingredient['name'], newQuantity);
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(
+      title: const Text("What's In Your Fridge"),
+    ),
+    body: isLoading
+        ? const Center(child: CircularProgressIndicator())
+        : Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: foodController,
+                        decoration: InputDecoration(
+                          labelText: "Enter food name",
                         ),
                       ),
-                    );
-                  },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: () => _showAddItemDialog(context),
+                    ),
+                  ],
                 ),
+              ),
+              inventoryItems.isEmpty
+                  ? const Center(child: Text('You have no items in your fridge.'))
+                  : Expanded(
+                      child: GridView.builder(
+                        padding: const EdgeInsets.all(16.0),
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                        itemCount: inventoryItems.length,
+                        itemBuilder: (context, index) {
+                          final ingredient = inventoryItems[index];
+                          final expirationDate = ingredient['expiration_date'] != null
+                              ? DateTime.tryParse(ingredient['expiration_date'])?.toLocal()
+                              : null;
+                          final expirationDateFormatted = expirationDate != null
+                              ? DateFormat('yyyy-MM-dd').format(expirationDate)
+                              : null;
+
+                          return GestureDetector(
+                            onTap: () => toggleIngredient(index),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: ingredient['selected']
+                                      ? Colors.blue
+                                      : Colors.blue[100]!,
+                                  width: ingredient['selected'] ? 2 : 1,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(ingredient['emoji'], style: const TextStyle(fontSize: 40)),
+                                  const SizedBox(height: 8),
+                                  Text(ingredient['name'], style: const TextStyle(fontSize: 16)),
+                                  if (expirationDateFormatted != null)
+                                    Text(
+                                      'Expires on: $expirationDateFormatted',
+                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.remove),
+                                        onPressed: () {
+                                          if (ingredient['quantity'] > 0) {
+                                            int newQuantity = ingredient['quantity'] - 1;
+                                            updateQuantity(ingredient['name'], newQuantity);
+                                          }
+                                        },
+                                      ),
+                                      Text('${ingredient['quantity']}', style: const TextStyle(fontSize: 16)),
+                                      IconButton(
+                                        icon: const Icon(Icons.add),
+                                        onPressed: () {
+                                          int newQuantity = ingredient['quantity'] + 1;
+                                          updateQuantity(ingredient['name'], newQuantity);
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+            ],
+          ),
+  );
+}
+
+  // Dialog göstererek kullanıcıdan bilgi al
+  void _showAddItemDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Add New Item"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: foodController,
+                decoration: const InputDecoration(
+                  labelText: "Food Name",
+                ),
+              ),
+              TextField(
+                controller: quantityController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: "Quantity",
+                ),
+              ),
+              ListTile(
+                title: Text(selectedExpirationDate == null
+                    ? 'Select Expiration Date'
+                    : 'Expiration Date: ${selectedExpirationDate!.toLocal()}'),
+                onTap: () => _selectExpirationDate(context),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text("Cancel"),
+            ),
+            TextButton(
+              onPressed: () {
+                addItemToInventory();
+                Navigator.of(context).pop();
+              },
+              child: const Text("Add Item"),
+            ),
+          ],
+        );
+      },
     );
   }
 }
