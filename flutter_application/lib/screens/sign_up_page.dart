@@ -160,6 +160,12 @@ class SignUpPageState extends State<SignUpPage> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter your name';
                           }
+                          if (value.length < 3) {
+                            return 'Name must be at least 3 characters';
+                            }
+                            if (!RegExp(r'^[a-zA-Z]+$').hasMatch(value)) {
+                              return 'Name can only contain letters';
+                              }
                           return null;
                         },
                       ),
@@ -173,6 +179,12 @@ class SignUpPageState extends State<SignUpPage> {
                           if (value == null || value.isEmpty) {
                             return 'Please enter your surname';
                           }
+                          if (value.length < 3) {
+                            return 'Surname must be at least 3 characters';
+                            }
+                          if (!RegExp(r'^[a-zA-Z]+$').hasMatch(value)) {
+                            return 'Surname can only contain letters';
+                            }
                           return null;
                         },
                       ),
