@@ -25,6 +25,13 @@ class SupabaseHelper {
           'Supabase is not initialized. Make sure to call Supabase.initialize() in main.dart');
     }
   }
+  Future<String?> getCurrentUserId() async {
+  if (!_initialized) {
+    await initialize();
+  }
+  return client.auth.currentUser?.id;
+}
+
 
   // Fetch inventory items from the database
   Future<List<Map<String, dynamic>>> getInventory() async {
@@ -88,6 +95,23 @@ class SupabaseHelper {
 
     return List<Map<String, dynamic>>.from(response);
   }
+  // Fetch user profile info
+  Future<Map<String, dynamic>?> getUserProfile(String uuidUserId) async {
+  try {
+    if (!_initialized) await initialize();
+
+    final response = await client
+        .from('profiles')
+        .select('full_name, is_family_member, family_id')
+        .eq('id', uuidUserId)
+        .single(); // Çünkü sadece 1 kullanıcı geleceğini biliyoruz.
+
+    return Map<String, dynamic>.from(response);
+  } catch (e) {
+    _logger.severe('Error fetching user profile: $e');
+    return null;
+  }
+}
 
   // Get shopping list by UUID user ID
   Future<List<Map<String, dynamic>>> getShoppingListByUserId(
@@ -101,4 +125,6 @@ class SupabaseHelper {
 
     return List<Map<String, dynamic>>.from(response);
   }
+  
 }
+
