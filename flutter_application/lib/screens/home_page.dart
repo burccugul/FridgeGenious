@@ -9,6 +9,8 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_application/database/supabase_helper.dart'; // Updated import
 
+
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -18,10 +20,17 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   int _currentIndex = 0;
+String fullName = '';
+bool isFamilyMember = false;
+String? familyId;
+bool isLoading = true;
+
+
   final List<IconData> _icons = [
     Icons.home,
     Icons.camera_alt_outlined,
     Icons.settings,
+    
   ];
 
   final ImagePicker _picker = ImagePicker();
@@ -112,15 +121,34 @@ class HomePageState extends State<HomePage> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _supabaseHelper.initialize().then((_) {
-      fetchInventory();
-    }).catchError((error) {
-      print('Failed to initialize Supabase: $error');
-    });
+ @override
+void initState() {
+  super.initState();
+  _supabaseHelper.initialize().then((_) {
+    fetchInventory();
+    fetchUserProfile(); // Kullanıcı bilgisini çekiyoruz
+  }).catchError((error) {
+    print('Failed to initialize Supabase: $error');
+  });
+}
+  
+
+Future<void> fetchUserProfile() async {
+  final userId = await SupabaseHelper().getCurrentUserId();
+
+  if (userId != null) {
+    final profile = await SupabaseHelper().getUserProfile(userId);
+
+    if (profile != null) {
+      setState(() {
+        fullName = profile['full_name'] ?? '';
+        isFamilyMember = profile['is_family_member'] ?? false;
+        familyId = profile['family_id'];
+        isLoading = false;
+      });
+    }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -170,17 +198,17 @@ class HomePageState extends State<HomePage> {
                   children: [
                     const SizedBox(height: 20),
                     Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Hey, Admin',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontStyle: FontStyle.italic,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
+                     alignment: Alignment.centerLeft,
+                     child: Text(
+                     'Hey, ${fullName ?? 'User'}${isFamilyMember ? ' (Family Account)' : ''}',
+                      style: TextStyle(
+                      fontSize: 32,
+                      fontStyle: FontStyle.italic,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
+                     ),
+                    ),  
                     const SizedBox(height: 10),
                     Align(
                       alignment: Alignment.centerLeft,

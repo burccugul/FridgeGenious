@@ -21,6 +21,7 @@ class SignUpPageState extends State<SignUpPage> {
   final _confirmPasswordController = TextEditingController();
 
   bool _isLoading = false;
+  final Stringfullname = '';
   final supabase = Supabase.instance.client;
 
   @override
@@ -50,11 +51,18 @@ class SignUpPageState extends State<SignUpPage> {
           data: {
             'name': _nameController.text,
             'surname': _surnameController.text,
-            'full_name': '${_nameController.text} ${_surnameController.text}'
+            'full_name': '${_nameController.text} ${_surnameController.text}',
+            'email': _emailController.text.trim(), // <-- BU SATIRI EKLE
           });
 
       if (response.user != null) {
         // Kullanıcının kendi inventory tablosunu oluştur
+        // Profil kaydını güncelle veya oluştur
+  await supabase.from('profiles').upsert({
+    'id': response.user!.id,
+    'email': _emailController.text.trim(), // formdan girilen email
+    'full_name': '${_nameController.text} ${_surnameController.text}',
+  });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
