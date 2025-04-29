@@ -58,11 +58,11 @@ class SignUpPageState extends State<SignUpPage> {
       if (response.user != null) {
         // Kullanıcının kendi inventory tablosunu oluştur
         // Profil kaydını güncelle veya oluştur
-  await supabase.from('profiles').upsert({
-    'id': response.user!.id,
-    'email': _emailController.text.trim(), // formdan girilen email
-    'full_name': '${_nameController.text} ${_surnameController.text}',
-  });
+        await supabase.from('profiles').upsert({
+          'id': response.user!.id,
+          'email': _emailController.text.trim(), // formdan girilen email
+          'full_name': '${_nameController.text} ${_surnameController.text}',
+        });
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -170,10 +170,10 @@ class SignUpPageState extends State<SignUpPage> {
                           }
                           if (value.length < 3) {
                             return 'Name must be at least 3 characters';
-                            }
-                            if (!RegExp(r'^[a-zA-Z]+$').hasMatch(value)) {
-                              return 'Name can only contain letters';
-                              }
+                          }
+                          if (!RegExp(r'^[a-zA-Z]+$').hasMatch(value)) {
+                            return 'Name can only contain letters';
+                          }
                           return null;
                         },
                       ),
@@ -189,10 +189,10 @@ class SignUpPageState extends State<SignUpPage> {
                           }
                           if (value.length < 3) {
                             return 'Surname must be at least 3 characters';
-                            }
+                          }
                           if (!RegExp(r'^[a-zA-Z]+$').hasMatch(value)) {
                             return 'Surname can only contain letters';
-                            }
+                          }
                           return null;
                         },
                       ),

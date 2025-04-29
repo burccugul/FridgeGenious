@@ -147,38 +147,137 @@ class FridgePageState extends State<FridgePage> {
     _getEffectiveUserID().then((_) => fetchInventory());
   }
 
-  // Yeni öğe ekleme fonksiyonu
+  // Son kullanma tarihine kalan gün sayısını hesapla
+  int? getDaysUntilExpiration(String? expirationDateStr) {
+    if (expirationDateStr == null) return null;
+
+    final expirationDate = DateTime.tryParse(expirationDateStr)?.toLocal();
+    if (expirationDate == null) return null;
+
+    final today = DateTime.now();
+    final difference = expirationDate.difference(today).inDays;
+    return difference;
+  }
+
   Future<void> addItemToInventory() async {
     final foodName = foodController.text.trim();
     final quantity = int.tryParse(quantityController.text) ?? 1;
     final expirationDate = selectedExpirationDate;
 
     if (foodName.isEmpty || expirationDate == null) {
-      _logger.warning("Food name or expiration date cannot be empty!");
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text("Please enter food name and expiration date.")),
+      );
+      return;
+    }
+
+    if (effectiveUserID == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("User not logged in.")),
+      );
       return;
     }
 
     try {
-      if (effectiveUserID == null) {
-        _logger.warning('No user is logged in');
-        return;
-      }
+      FocusScope.of(context).unfocus();
 
-      final response = await supabase.from('inventory').insert([
-        {
-          'food_name': foodName,
-          'quantity': quantity,
-          'expiration_date': expirationDate.toIso8601String(),
-          'uuid_userid': effectiveUserID,
+      // Show loading indicator
+      setState(() {
+        isLoading = true;
+      });
+
+      // Aynı isimde bir ürün var mı kontrol et
+      final existingItemIndex = inventoryItems.indexWhere(
+          (item) => item['name'].toLowerCase() == foodName.toLowerCase());
+
+      if (existingItemIndex != -1) {
+        // Aynı isimde ürün varsa, miktarını güncelle
+        final existingItem = inventoryItems[existingItemIndex];
+        final newQuantity = (existingItem['quantity'] as int) + quantity;
+
+        // Veritabanında güncelle
+        await supabase
+            .from('inventory')
+            .update({
+              'quantity': newQuantity,
+              'expiration_date': expirationDate
+                  .toIso8601String(), // Son kullanma tarihini de güncelle
+              'last_image_upload': DateTime.now().toIso8601String(),
+            })
+            .eq('food_name', existingItem['name'])
+            .eq('uuid_userid', effectiveUserID);
+
+        // UI'yi güncelle
+        setState(() {
+          // Mevcut öğeyi listeden kaldır
+          inventoryItems.removeAt(existingItemIndex);
+
+          // Güncellenmiş öğeyi listenin başına ekle
+          inventoryItems.insert(0, {
+            'name': existingItem['name'],
+            'emoji': existingItem['emoji'],
+            'quantity': newQuantity,
+            'selected': existingItem['selected'],
+            'expiration_date': expirationDate.toIso8601String(),
+          });
+
+          isLoading = false;
+        });
+
+        // Başarı mesajı göster
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text(
+                  "${existingItem['name']} quantity updated to $newQuantity!")),
+        );
+      } else {
+        // Yeni ürün ekle
+        final response = await supabase.from('inventory').insert([
+          {
+            'food_name': foodName,
+            'quantity': quantity,
+            'expiration_date': expirationDate.toIso8601String(),
+            'uuid_userid': effectiveUserID,
+            'last_image_upload': DateTime.now().toIso8601String(),
+          }
+        ]).select();
+
+        // Immediately add the new item to the local list
+        if (response != null && response.isNotEmpty) {
+          final expirationDateStr = expirationDate.toIso8601String();
+
+          // Add the new item to the beginning of the local inventory list
+          setState(() {
+            inventoryItems.insert(0, {
+              'name': foodName,
+              'emoji': emojiMap[foodName] ?? '🍽️',
+              'quantity': quantity,
+              'selected': false,
+              'expiration_date': expirationDateStr,
+            });
+            isLoading = false;
+          });
+
+          // Başarı mesajı göster
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("$foodName added successfully!")),
+          );
         }
-      ]);
-
-      if (response != null) {
-        _logger.info('Item added to inventory: $foodName');
-        fetchInventory(); // Envanteri güncelle
       }
-    } catch (e) {
-      _logger.severe('Error adding item: $e');
+
+      // Input alanlarını temizle
+      foodController.clear();
+      quantityController.clear();
+      selectedExpirationDate = null;
+    } catch (e, stackTrace) {
+      setState(() {
+        isLoading = false;
+      });
+      _logger.severe('Error adding item: $e', e, stackTrace);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error adding item: $e")),
+      );
     }
   }
 
@@ -237,6 +336,10 @@ class FridgePageState extends State<FridgePage> {
         return;
       }
 
+      setState(() {
+        isLoading = true;
+      });
+
       final response = await supabase
           .from('inventory')
           .select()
@@ -253,11 +356,15 @@ class FridgePageState extends State<FridgePage> {
             'emoji': emojiMap[foodName] ?? '🍽️',
             'quantity': quantity,
             'selected': false,
+            'expiration_date': item['expiration_date'],
           };
         }).toList();
         isLoading = false; // Veriler yüklendi
       });
     } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
       _logger.severe('Error fetching inventory: $e');
     }
   }
@@ -286,24 +393,22 @@ class FridgePageState extends State<FridgePage> {
 
         await supabase
             .from('inventory')
-            .update({'quantity': 0})
+            .update({
+              'quantity': 0,
+              'last_image_upload': DateTime.now().toIso8601String(),
+            })
             .eq('food_name', foodName)
             .eq('uuid_userid', effectiveUserID);
       } else {
         await supabase
             .from('inventory')
-            .update({'quantity': newQuantity})
+            .update({
+              'quantity': newQuantity,
+              'last_image_upload': DateTime.now().toIso8601String(),
+            })
             .eq('food_name', foodName)
             .eq('uuid_userid', effectiveUserID);
       }
-
-      setState(() {
-        final index =
-            inventoryItems.indexWhere((item) => item['name'] == foodName);
-        if (index != -1) {
-          inventoryItems[index]['quantity'] = newQuantity;
-        }
-      });
     } catch (e) {
       _logger.severe('Error updating quantity: $e');
     }
@@ -351,121 +456,203 @@ class FridgePageState extends State<FridgePage> {
       appBar: AppBar(
         title: const Text("What's In Your Fridge"),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
               children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: foodController,
-                          decoration: InputDecoration(
-                            labelText: "Enter food name",
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.add),
-                        onPressed: () => _showAddItemDialog(context),
-                      ),
-                    ],
+                Expanded(
+                  child: TextField(
+                    controller: foodController,
+                    decoration: InputDecoration(
+                      labelText: "Enter food name",
+                    ),
                   ),
                 ),
-                inventoryItems.isEmpty
-                    ? const Center(
-                        child: Text('You have no items in your fridge.'))
-                    : Expanded(
-                        child: GridView.builder(
-                          padding: const EdgeInsets.all(16.0),
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                          ),
-                          itemCount: inventoryItems.length,
-                          itemBuilder: (context, index) {
-                            final ingredient = inventoryItems[index];
-                            final expirationDate =
-                                ingredient['expiration_date'] != null
-                                    ? DateTime.tryParse(
-                                            ingredient['expiration_date'])
-                                        ?.toLocal()
-                                    : null;
-                            final expirationDateFormatted =
-                                expirationDate != null
-                                    ? DateFormat('yyyy-MM-dd')
-                                        .format(expirationDate)
-                                    : null;
-
-                            return GestureDetector(
-                              onTap: () => toggleIngredient(index),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: ingredient['selected']
-                                        ? Colors.orangeAccent
-                                        : Colors.blue[100]!,
-                                    width: ingredient['selected'] ? 2 : 1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(16),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(ingredient['emoji'],
-                                        style: const TextStyle(fontSize: 40)),
-                                    const SizedBox(height: 8),
-                                    Text(ingredient['name'],
-                                        style: const TextStyle(fontSize: 16)),
-                                    if (expirationDateFormatted != null)
-                                      Text(
-                                        'Expires on: $expirationDateFormatted',
-                                        style: const TextStyle(
-                                            fontSize: 12, color: Colors.grey),
-                                      ),
-                                    const SizedBox(height: 8),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        IconButton(
-                                          icon: const Icon(Icons.remove),
-                                          onPressed: () {
-                                            if (ingredient['quantity'] > 0) {
-                                              int newQuantity =
-                                                  ingredient['quantity'] - 1;
-                                              updateQuantity(ingredient['name'],
-                                                  newQuantity);
-                                            }
-                                          },
-                                        ),
-                                        Text('${ingredient['quantity']}',
-                                            style:
-                                                const TextStyle(fontSize: 16)),
-                                        IconButton(
-                                          icon: const Icon(Icons.add),
-                                          onPressed: () {
-                                            int newQuantity =
-                                                ingredient['quantity'] + 1;
-                                            updateQuantity(ingredient['name'],
-                                                newQuantity);
-                                          },
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  onPressed: () => _showAddItemDialog(context),
+                ),
               ],
             ),
+          ),
+          isLoading
+              ? const Expanded(
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color.fromARGB(255, 241, 147, 7),
+                      ),
+                    ),
+                  ),
+                )
+              : inventoryItems.isEmpty
+                  ? const Expanded(
+                      child: Center(
+                        child: Text('You have no items in your fridge.'),
+                      ),
+                    )
+                  : Expanded(
+                      child: GridView.builder(
+                        padding: const EdgeInsets.all(16.0),
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                        itemCount: inventoryItems.length,
+                        itemBuilder: (context, index) {
+                          final ingredient = inventoryItems[index];
+                          final expirationDate =
+                              ingredient['expiration_date'] != null
+                                  ? DateTime.tryParse(
+                                          ingredient['expiration_date'])
+                                      ?.toLocal()
+                                  : null;
+                          final expirationDateFormatted = expirationDate != null
+                              ? DateFormat('yyyy-MM-dd').format(expirationDate)
+                              : null;
+
+                          // Son kullanma tarihine kalan gün sayısını hesapla
+                          final daysUntilExpiration = getDaysUntilExpiration(
+                              ingredient['expiration_date']);
+
+                          // Son kullanma tarihine 5 gün veya daha az kaldıysa uyarı göster
+                          final bool isExpiringSoon =
+                              daysUntilExpiration != null &&
+                                  daysUntilExpiration >= 0 &&
+                                  daysUntilExpiration <= 5;
+
+                          // Son kullanma tarihi geçtiyse
+                          final bool isExpired = daysUntilExpiration != null &&
+                              daysUntilExpiration < 0;
+
+                          return GestureDetector(
+                            onTap: () => toggleIngredient(index),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: ingredient['selected']
+                                      ? Colors.orangeAccent
+                                      : Colors.blue[100]!,
+                                  width: ingredient['selected'] ? 2 : 1,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Stack(
+                                children: [
+                                  Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(ingredient['emoji'],
+                                          style: const TextStyle(fontSize: 40)),
+                                      const SizedBox(height: 8),
+                                      Text(ingredient['name'],
+                                          style: const TextStyle(fontSize: 16)),
+                                      if (expirationDateFormatted != null)
+                                        Text(
+                                          'Expires on: $expirationDateFormatted',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isExpired
+                                                ? Colors.red
+                                                : isExpiringSoon
+                                                    ? Colors.orange
+                                                    : Colors.grey,
+                                          ),
+                                        ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.remove),
+                                            onPressed: () {
+                                              if (ingredient['quantity'] > 0) {
+                                                int newQuantity =
+                                                    ingredient['quantity'] - 1;
+                                                updateQuantity(
+                                                    ingredient['name'],
+                                                    newQuantity);
+                                              }
+                                            },
+                                          ),
+                                          Text('${ingredient['quantity']}',
+                                              style: const TextStyle(
+                                                  fontSize: 16)),
+                                          IconButton(
+                                            icon: const Icon(Icons.add),
+                                            onPressed: () {
+                                              int newQuantity =
+                                                  ingredient['quantity'] + 1;
+                                              updateQuantity(ingredient['name'],
+                                                  newQuantity);
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+
+                                  // Son kullanma tarihine 5 gün veya daha az kaldıysa uyarı göster
+                                  if (isExpiringSoon)
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.orange,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '$daysUntilExpiration days left',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+
+                                  // Son kullanma tarihi geçtiyse uyarı göster
+                                  if (isExpired)
+                                    Positioned(
+                                      top: 8,
+                                      right: 8,
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red,
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          'Süresi doldu!',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+        ],
+      ),
       floatingActionButton: selectedIngredientsCount > 0
           ? FloatingActionButton.extended(
               onPressed: () => _navigateToSpecialRecipe(),
@@ -477,52 +664,75 @@ class FridgePageState extends State<FridgePage> {
     );
   }
 
-  // Dialog göstererek kullanıcıdan bilgi al
   void _showAddItemDialog(BuildContext context) {
+    // Reset controllers and selected date when opening dialog
+    quantityController.text = "1"; // Default quantity
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Add New Item"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: foodController,
-                decoration: const InputDecoration(
-                  labelText: "Food Name",
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text("Add New Item"),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: foodController,
+                    decoration: const InputDecoration(
+                      labelText: "Food Name",
+                    ),
+                  ),
+                  TextField(
+                    controller: quantityController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: "Quantity",
+                    ),
+                  ),
+                  ListTile(
+                    title: Text(
+                      selectedExpirationDate == null
+                          ? 'Select Expiration Date'
+                          : 'Expiration Date: ${DateFormat('yyyy-MM-dd').format(selectedExpirationDate!)}',
+                    ),
+                    onTap: () async {
+                      // Takvim seçiciyi gösteriyoruz
+                      final DateTime? picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2101),
+                      );
+
+                      if (picked != null && picked != selectedExpirationDate) {
+                        setDialogState(() {
+                          selectedExpirationDate =
+                              picked; // Tarihi güncelliyoruz
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: const Text("Cancel"),
                 ),
-              ),
-              TextField(
-                controller: quantityController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: "Quantity",
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    addItemToInventory(); // Dialog kapandıktan sonra ekleme işlemini yapıyoruz
+                  },
+                  child: const Text("Add Item"),
                 ),
-              ),
-              ListTile(
-                title: Text(selectedExpirationDate == null
-                    ? 'Select Expiration Date'
-                    : 'Expiration Date: ${selectedExpirationDate!.toLocal()}'),
-                onTap: () => _selectExpirationDate(context),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text("Cancel"),
-            ),
-            TextButton(
-              onPressed: () {
-                addItemToInventory();
-                Navigator.of(context).pop();
-              },
-              child: const Text("Add Item"),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );

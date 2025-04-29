@@ -96,7 +96,6 @@ class LoginPageState extends State<LoginPage> {
       ),
     );
   }
-  
 
   Widget _buildInputField(
       TextEditingController controller, String hint, IconData icon,
@@ -139,40 +138,43 @@ class LoginPageState extends State<LoginPage> {
               final email = _nameController.text.trim();
               final password = _passwordController.text.trim();
 
-try {
-  if (email.isEmpty || password.isEmpty) {
-    // Eğer email veya şifre boşsa uyarı ver
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Please enter your email and password.')),
-    );
-    return; // İşlemi burada kesiyoruz, Supabase'e istek atmayacağız
-  }
+              try {
+                if (email.isEmpty || password.isEmpty) {
+                  // Eğer email veya şifre boşsa uyarı ver
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Please enter your email and password.')),
+                  );
+                  return; // İşlemi burada kesiyoruz, Supabase'e istek atmayacağız
+                }
 
-  final response = await Supabase.instance.client.auth
-      .signInWithPassword(email: email, password: password);
+                final response = await Supabase.instance.client.auth
+                    .signInWithPassword(email: email, password: password);
 
-  final user = response.user;
+                final user = response.user;
 
-  if (user != null) {
-    logger.i('🔐 Giriş başarılı. Kullanıcı UUID: ${user.id}');
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomePage()),
-    );
-  } else {
-    logger.w('⚠️ Kullanıcı bilgileri hatalı');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Check your email and password.')),
-    );
-  }
-} catch (e) {
-  logger.e('🚫 Giriş hatası: $e');
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(content: Text('Login unsuccessful. Please check your email and password.')),
-  );
-}
-
+                if (user != null) {
+                  logger.i('🔐 Giriş başarılı. Kullanıcı UUID: ${user.id}');
+                  if (!mounted) return;
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomePage()),
+                  );
+                } else {
+                  logger.w('⚠️ Kullanıcı bilgileri hatalı');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                        content: Text('Check your email and password.')),
+                  );
+                }
+              } catch (e) {
+                logger.e('🚫 Giriş hatası: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                      content: Text(
+                          'Login unsuccessful. Please check your email and password.')),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.black,
