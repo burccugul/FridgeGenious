@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '/services/gemini_recipe_service.dart';
+import '/services/recipe_image_service.dart'; // RecipeImageService'i import ediyoruz
 import 'dart:convert';
 import 'recipe_detail_page.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class SpecialRecipePage extends StatefulWidget {
   final List<String> selectedIngredients;
@@ -19,16 +21,46 @@ class _SpecialRecipePageState extends State<SpecialRecipePage> {
   bool isLoading = true;
   Map<String, dynamic>? generatedRecipe;
   final GeminiRecipeService _recipeService = GeminiRecipeService();
+  final RecipeImageService _imageService =
+      RecipeImageService(); // RecipeImageService örneği oluşturuyoruz
+  String? recipeImageUrl; // Resim URL'sini saklamak için
+  final _supabase = Supabase.instance.client;
+  String? effectiveUserID;
 
   @override
   void initState() {
     super.initState();
-    _generateSpecialRecipe();
+    _getEffectiveUserID().then((_) {
+      _generateSpecialRecipe();
+    });
+  }
+
+  Future<void> _getEffectiveUserID() async {
+    try {
+      final currentUserID = _supabase.auth.currentUser?.id;
+      final userIDArray = '["$currentUserID"]';
+
+      final familyPackagesResponse = await _supabase
+          .from('family_packages')
+          .select()
+          .or('owner_user_id.eq.$currentUserID,member_user_ids.cs.$userIDArray');
+
+      if (familyPackagesResponse != null && familyPackagesResponse.isNotEmpty) {
+        final familyPackage = familyPackagesResponse[0];
+        effectiveUserID = familyPackage['owner_user_id'];
+      } else {
+        effectiveUserID = currentUserID;
+      }
+    } catch (e) {
+      print('Error getting effective user ID: $e');
+      effectiveUserID = _supabase.auth.currentUser?.id;
+    }
   }
 
   Future<void> _generateSpecialRecipe() async {
     setState(() {
       isLoading = true;
+      recipeImageUrl = null; // Yeni tarif ürettiğimizde resmi sıfırlıyoruz
     });
 
     try {
@@ -67,6 +99,11 @@ class _SpecialRecipePageState extends State<SpecialRecipePage> {
         generatedRecipe = parsed;
         isLoading = false;
       });
+
+      // Tarif başarıyla oluşturulduktan sonra resim URL'sini al
+      if (parsed.containsKey('recipe_name')) {
+        _fetchRecipeImage(parsed['recipe_name']);
+      }
     } catch (e) {
       print('Recipe generation error: $e');
       setState(() {
@@ -76,6 +113,27 @@ class _SpecialRecipePageState extends State<SpecialRecipePage> {
         };
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _fetchRecipeImage(String recipeName) async {
+    try {
+      final imageUrl = await _imageService.getImageForRecipe(recipeName);
+      setState(() {
+        recipeImageUrl = imageUrl;
+      });
+
+      // Supabase'e görsel URL'sini kaydet
+      if (effectiveUserID != null && imageUrl != null) {
+        await _supabase
+            .from('recipes')
+            .update({'image_url': imageUrl})
+            .eq('uuid_userid', effectiveUserID)
+            .eq('recipe_name', recipeName);
+        print('Image URL saved to database for $recipeName');
+      }
+    } catch (e) {
+      print('Error fetching or saving recipe image: $e');
     }
   }
 
@@ -300,7 +358,7 @@ class _SpecialRecipePageState extends State<SpecialRecipePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Recipe Image/Header with updated styling
+                // Recipe Image/Header - RecipeImageService ile alınan resmi kullanıyoruz
                 Stack(
                   children: [
                     ClipRRect(
@@ -312,10 +370,44 @@ class _SpecialRecipePageState extends State<SpecialRecipePage> {
                         height: 200,
                         width: double.infinity,
                         color: const Color.fromARGB(255, 175, 175, 172),
-                        child: const Center(
-                          child: Icon(Icons.restaurant,
-                              size: 50, color: Colors.grey),
-                        ),
+                        child: recipeImageUrl != null
+                            ? Image.network(
+                                recipeImageUrl!,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                errorBuilder: (context, error, stackTrace) {
+                                  // Resim yüklenemezse placeholder göster
+                                  return const Center(
+                                    child: Icon(Icons.restaurant,
+                                        size: 50, color: Colors.grey),
+                                  );
+                                },
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value:
+                                          loadingProgress.expectedTotalBytes !=
+                                                  null
+                                              ? loadingProgress
+                                                      .cumulativeBytesLoaded /
+                                                  loadingProgress
+                                                      .expectedTotalBytes!
+                                              : null,
+                                      valueColor:
+                                          const AlwaysStoppedAnimation<Color>(
+                                        Color.fromARGB(255, 241, 147, 7),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : const Center(
+                                child: Icon(Icons.restaurant,
+                                    size: 50, color: Colors.grey),
+                              ),
                       ),
                     ),
                     Positioned(
@@ -505,11 +597,13 @@ class _SpecialRecipePageState extends State<SpecialRecipePage> {
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: () {
+                          // RecipeDetailPage'e sadece recipe değerini gönderiyoruz
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  RecipeDetailPage(recipe: generatedRecipe),
+                              builder: (context) => RecipeDetailPage(
+                                recipe: generatedRecipe,
+                              ),
                             ),
                           );
                         },

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '/services/gemini_recipe_service.dart';
+import '/services/recipe_image_service.dart'; // Import the new service
 import 'dart:convert';
 import 'recipe_detail_page.dart';
 import 'package:flutter_application/screens/settings_page.dart';
@@ -18,6 +19,8 @@ class _RecipePageState extends State<RecipePage>
   late TabController _tabController;
   final _supabase = Supabase.instance.client;
   String? effectiveUserID;
+  final RecipeImageService _imageService =
+      RecipeImageService(); // Initialize image service
 
   final List<IconData> _icons = [
     Icons.home,
@@ -33,6 +36,12 @@ class _RecipePageState extends State<RecipePage>
 
   bool isLoading = false;
   bool isFavoritesLoading = false;
+
+  // Image loading states
+  String? suggestedRecipeImage;
+  bool isLoadingSuggestedImage = false;
+  Map<String, String?> favoriteRecipeImages = {};
+  Map<String, bool> loadingFavoriteImages = {};
 
   @override
   void initState() {
@@ -100,8 +109,78 @@ class _RecipePageState extends State<RecipePage>
     }
   }
 
-  // Favori tarifleri yükle
-// Modify the _loadFavoriteRecipes method in the _RecipePageState class
+  Future<void> _loadSuggestedRecipeImage() async {
+    if (generatedRecipe == null || generatedRecipe!['recipe_name'] == null)
+      return;
+
+    setState(() {
+      isLoadingSuggestedImage = true;
+    });
+
+    try {
+      final recipeName = generatedRecipe!['recipe_name'];
+      final imageUrl = await _imageService.getImageForRecipe(recipeName);
+
+      if (mounted) {
+        setState(() {
+          suggestedRecipeImage = imageUrl;
+          isLoadingSuggestedImage = false;
+        });
+      }
+
+      // imageUrl'i Supabase veritabanına kaydet
+      if (effectiveUserID != null && imageUrl != null) {
+        await _supabase
+            .from('recipes')
+            .update({'image_url': imageUrl})
+            .eq('uuid_userid', effectiveUserID)
+            .eq('recipe_name', recipeName);
+        print('Image URL saved to database for $recipeName');
+      }
+    } catch (e) {
+      print('Error loading or saving suggested recipe image: $e');
+      if (mounted) {
+        setState(() {
+          isLoadingSuggestedImage = false;
+        });
+      }
+    }
+  }
+
+  // Load favorite recipe images
+  Future<void> _loadFavoriteRecipeImage(int index, String recipeName) async {
+    if (recipeName.isEmpty) return;
+
+    setState(() {
+      loadingFavoriteImages[recipeName] = true;
+    });
+
+    try {
+      final imageUrl = await _imageService.getImageForRecipe(recipeName);
+
+      if (mounted) {
+        setState(() {
+          favoriteRecipeImages[recipeName] = imageUrl;
+          loadingFavoriteImages[recipeName] = false;
+        });
+      }
+    } catch (e) {
+      print('Error loading favorite recipe image for $recipeName: $e');
+      if (mounted) {
+        setState(() {
+          loadingFavoriteImages[recipeName] = false;
+        });
+      }
+    }
+  }
+
+  // Load all favorite recipe images
+  Future<void> _loadAllFavoriteRecipeImages() async {
+    for (int i = 0; i < favoriteRecipes.length; i++) {
+      final recipeName = favoriteRecipes[i]['recipe_name'] ?? 'Unnamed Recipe';
+      _loadFavoriteRecipeImage(i, recipeName);
+    }
+  }
 
   Future<void> _loadFavoriteRecipes() async {
     if (effectiveUserID == null) return;
@@ -143,6 +222,9 @@ class _RecipePageState extends State<RecipePage>
           isFavoritesLoading = false;
         });
         print('Loaded ${favoriteRecipes.length} unique favorite recipes');
+
+        // Load images for all favorite recipes
+        _loadAllFavoriteRecipeImages();
       }
     } catch (e) {
       print('Error loading favorite recipes: $e');
@@ -186,6 +268,9 @@ class _RecipePageState extends State<RecipePage>
           generatedRecipe = parsed;
           isLoading = false;
         });
+
+        // Load image for the generated recipe
+        _loadSuggestedRecipeImage();
       }
     } catch (e) {
       if (mounted) {
@@ -382,11 +467,74 @@ class _RecipePageState extends State<RecipePage>
                                                 width: double.infinity,
                                                 color: const Color.fromARGB(
                                                     255, 175, 175, 172),
-                                                child: const Center(
-                                                  child: Icon(Icons.restaurant,
-                                                      size: 50,
-                                                      color: Colors.grey),
-                                                ),
+                                                child: isLoadingSuggestedImage
+                                                    ? const Center(
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                          valueColor:
+                                                              AlwaysStoppedAnimation<
+                                                                  Color>(
+                                                            Color.fromARGB(255,
+                                                                241, 147, 7),
+                                                          ),
+                                                        ),
+                                                      )
+                                                    : suggestedRecipeImage !=
+                                                            null
+                                                        ? Image.network(
+                                                            suggestedRecipeImage!,
+                                                            fit: BoxFit.cover,
+                                                            loadingBuilder:
+                                                                (context, child,
+                                                                    loadingProgress) {
+                                                              if (loadingProgress ==
+                                                                  null)
+                                                                return child;
+                                                              return Center(
+                                                                child:
+                                                                    CircularProgressIndicator(
+                                                                  value: loadingProgress
+                                                                              .expectedTotalBytes !=
+                                                                          null
+                                                                      ? loadingProgress
+                                                                              .cumulativeBytesLoaded /
+                                                                          loadingProgress
+                                                                              .expectedTotalBytes!
+                                                                      : null,
+                                                                  valueColor:
+                                                                      const AlwaysStoppedAnimation<
+                                                                          Color>(
+                                                                    Color
+                                                                        .fromARGB(
+                                                                            255,
+                                                                            241,
+                                                                            147,
+                                                                            7),
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            },
+                                                            errorBuilder:
+                                                                (context, error,
+                                                                    stackTrace) {
+                                                              return const Center(
+                                                                child: Icon(
+                                                                    Icons
+                                                                        .restaurant,
+                                                                    size: 50,
+                                                                    color: Colors
+                                                                        .grey),
+                                                              );
+                                                            },
+                                                          )
+                                                        : const Center(
+                                                            child: Icon(
+                                                                Icons
+                                                                    .restaurant,
+                                                                size: 50,
+                                                                color: Colors
+                                                                    .grey),
+                                                          ),
                                               ),
                                             ),
                                             Positioned(
@@ -671,6 +819,13 @@ class _RecipePageState extends State<RecipePage>
                               itemCount: favoriteRecipes.length,
                               itemBuilder: (context, index) {
                                 final recipe = favoriteRecipes[index];
+                                final recipeName =
+                                    recipe['recipe_name'] ?? 'Unnamed Recipe';
+                                final isImageLoading =
+                                    loadingFavoriteImages[recipeName] ?? false;
+                                final imageUrl =
+                                    favoriteRecipeImages[recipeName];
+
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 16),
                                   elevation: 3,
@@ -682,17 +837,42 @@ class _RecipePageState extends State<RecipePage>
                                     ),
                                   ),
                                   child: InkWell(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) =>
-                                              RecipeDetailPage(recipe: recipe),
-                                        ),
-                                      ).then((_) {
-                                        // Detay sayfasından dönünce favori durumlarını yenile
-                                        _loadFavoriteRecipes();
-                                      });
+                                    onTap: () async {
+                                      final recipeName = recipe['recipe_name'];
+
+                                      final fullRecipeRows = await _supabase
+                                          .from('recipes')
+                                          .select()
+                                          .eq('uuid_userid', effectiveUserID)
+                                          .eq('recipe_name', recipeName);
+
+                                      if (fullRecipeRows != null &&
+                                          fullRecipeRows.isNotEmpty) {
+                                        final firstRow = fullRecipeRows.first;
+
+                                        // ingredients listesini tüm satırlardan topla
+                                        final ingredients = fullRecipeRows
+                                            .map((row) =>
+                                                row['food_name']?.toString())
+                                            .where((item) =>
+                                                item != null && item.isNotEmpty)
+                                            .toList();
+
+                                        final fullRecipe = {
+                                          'recipe_name': recipeName,
+                                          'time_minutes': firstRow['time'],
+                                          'ingredients': ingredients,
+                                        };
+
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                RecipeDetailPage(
+                                                    recipe: fullRecipe),
+                                          ),
+                                        );
+                                      }
                                     },
                                     borderRadius: BorderRadius.circular(12),
                                     child: Column(
@@ -710,90 +890,162 @@ class _RecipePageState extends State<RecipePage>
                                               topRight: Radius.circular(12),
                                             ),
                                           ),
-                                          child: Center(
-                                            child: Icon(
-                                              Icons.restaurant,
-                                              size: 40,
-                                              color: Colors.grey.shade500,
-                                            ),
-                                          ),
+                                          child: isImageLoading
+                                              ? const Center(
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    valueColor:
+                                                        AlwaysStoppedAnimation<
+                                                            Color>(
+                                                      Color.fromARGB(
+                                                          255, 241, 147, 7),
+                                                    ),
+                                                  ),
+                                                )
+                                              : imageUrl != null
+                                                  ? Image.network(
+                                                      imageUrl,
+                                                      fit: BoxFit.cover,
+                                                      width: double.infinity,
+                                                      loadingBuilder: (context,
+                                                          child,
+                                                          loadingProgress) {
+                                                        if (loadingProgress ==
+                                                            null) return child;
+                                                        return Center(
+                                                          child:
+                                                              CircularProgressIndicator(
+                                                            value: loadingProgress
+                                                                        .expectedTotalBytes !=
+                                                                    null
+                                                                ? loadingProgress
+                                                                        .cumulativeBytesLoaded /
+                                                                    loadingProgress
+                                                                        .expectedTotalBytes!
+                                                                : null,
+                                                            valueColor:
+                                                                const AlwaysStoppedAnimation<
+                                                                    Color>(
+                                                              Color.fromARGB(
+                                                                  255,
+                                                                  241,
+                                                                  147,
+                                                                  7),
+                                                            ),
+                                                          ),
+                                                        );
+                                                      },
+                                                      errorBuilder: (context,
+                                                          error, stackTrace) {
+                                                        return const Center(
+                                                          child: Icon(
+                                                              Icons.restaurant,
+                                                              size: 50,
+                                                              color:
+                                                                  Colors.grey),
+                                                        );
+                                                      },
+                                                    )
+                                                  : Center(
+                                                      child: Icon(
+                                                        Icons.restaurant,
+                                                        size: 50,
+                                                        color: Colors
+                                                            .grey.shade400,
+                                                      ),
+                                                    ),
                                         ),
-                                        // Recipe Details
+                                        // Recipe Content
                                         Padding(
-                                          padding: const EdgeInsets.all(12),
-                                          child: Row(
+                                          padding: const EdgeInsets.all(16),
+                                          child: Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
+                                              Row(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment
+                                                        .spaceBetween,
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
                                                       recipe['recipe_name'] ??
                                                           'Unnamed Recipe',
                                                       style: const TextStyle(
                                                         fontSize: 18,
                                                         fontWeight:
                                                             FontWeight.bold,
+                                                        color: Colors.black,
                                                       ),
+                                                      maxLines: 2,
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
                                                     ),
-                                                    const SizedBox(height: 4),
-                                                    if (recipe[
-                                                                'ingredients'] !=
-                                                            null &&
-                                                        recipe['ingredients']
-                                                            is List &&
-                                                        (recipe['ingredients']
-                                                                as List)
-                                                            .isNotEmpty)
+                                                  ),
+                                                  const Icon(
+                                                    Icons.favorite,
+                                                    color: Color.fromARGB(
+                                                        255, 241, 147, 7),
+                                                    size: 24,
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 8),
+                                              // Preparation time badge
+                                              if (recipe['time_minutes'] !=
+                                                  null)
+                                                Container(
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color.fromARGB(
+                                                        40, 241, 147, 7),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            12),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(
+                                                        Icons.timer,
+                                                        color: Color.fromARGB(
+                                                            255, 241, 147, 7),
+                                                        size: 16,
+                                                      ),
+                                                      const SizedBox(width: 4),
                                                       Text(
-                                                        'Ingredients: ${(recipe['ingredients'] as List).take(3).join(", ")}${(recipe['ingredients'] as List).length > 3 ? "..." : ""}',
-                                                        style: TextStyle(
-                                                          fontSize: 12,
-                                                          color: Colors
-                                                              .grey.shade600,
+                                                        '${recipe['time_minutes']} mins',
+                                                        style: const TextStyle(
+                                                          color: Color.fromARGB(
+                                                              255, 241, 147, 7),
+                                                          fontWeight:
+                                                              FontWeight.bold,
                                                         ),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
                                                       ),
-                                                  ],
+                                                    ],
+                                                  ),
                                                 ),
-                                              ),
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 4,
+                                              const SizedBox(height: 12),
+                                              // Preview of ingredients
+                                              if (recipe['ingredients'] !=
+                                                      null &&
+                                                  (recipe['ingredients']
+                                                          as List)
+                                                      .isNotEmpty)
+                                                Text(
+                                                  'Ingredients: ${(recipe['ingredients'] as List).take(2).join(", ")}${(recipe['ingredients'] as List).length > 2 ? "..." : ""}',
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade700,
+                                                    fontSize: 14,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
                                                 ),
-                                                decoration: BoxDecoration(
-                                                  color: const Color.fromARGB(
-                                                      255, 241, 147, 7),
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                ),
-                                                child: Row(
-                                                  children: [
-                                                    const Icon(
-                                                      Icons.timer,
-                                                      color: Colors.white,
-                                                      size: 14,
-                                                    ),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      '${recipe['time_minutes'] ?? 20} min',
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 12,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
                                             ],
                                           ),
                                         ),
@@ -809,110 +1061,44 @@ class _RecipePageState extends State<RecipePage>
           ],
         ),
       ),
-      bottomNavigationBar: _buildCurvedNavigationBar(),
-    );
-  }
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.white,
+        selectedItemColor: const Color.fromARGB(255, 241, 147, 7),
+        unselectedItemColor: Colors.grey,
+        currentIndex: _currentIndex,
+        onTap: (index) {
+          if (index != _currentIndex) {
+            setState(() {
+              _currentIndex = index;
+            });
 
-  Widget _buildCurvedNavigationBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 10,
-            offset: Offset(0, -2),
+            // Navigate to the appropriate page based on the selected index
+            if (index == 0) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const HomePage()),
+              );
+            } else if (index == 2) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsPage()),
+              );
+            }
+            // For index 1 (recipes), we're already on the RecipePage so no navigation needed
+          }
+        },
+        items: List.generate(
+          _icons.length,
+          (index) => BottomNavigationBarItem(
+            icon: Icon(_icons[index]),
+            label: index == 0
+                ? 'Home'
+                : index == 1
+                    ? 'Recipes'
+                    : 'Settings',
           ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: List.generate(_icons.length, (index) {
-            return GestureDetector(
-              onTap: () {
-                setState(() {
-                  _currentIndex = index;
-                });
-
-                if (index == 1) {
-                  final GlobalKey<HomePageState> _homeKey =
-                      GlobalKey<HomePageState>();
-
-                  _homeKey.currentState?.pickImage();
-                } else if (index == 2) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) => const SettingsPage()),
-                  );
-                }
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOut,
-                width: _currentIndex == index ? 60 : 50,
-                height: _currentIndex == index ? 60 : 50,
-                decoration: BoxDecoration(
-                  color: _currentIndex == index
-                      ? const Color.fromARGB(255, 255, 230, 149)
-                      : Colors.grey[300],
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  _icons[index],
-                  size: _currentIndex == index ? 30 : 24,
-                  color: _currentIndex == index ? Colors.white : Colors.black54,
-                ),
-              ),
-            );
-          }),
         ),
       ),
     );
   }
-
-  Widget buildCustomButton({
-    required String text,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onPressed,
-    double iconSize = 24,
-    Color textColor = Colors.white,
-  }) {
-    return ElevatedButton.icon(
-      onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-        minimumSize: const Size(double.infinity, 60),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(30),
-        ),
-      ),
-      icon: Icon(icon, size: iconSize, color: Colors.black),
-      label: Text(text, style: TextStyle(fontSize: 18, color: textColor)),
-    );
-  }
-}
-
-class CurvedPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    var paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-    var path = Path();
-    path.moveTo(0, size.height * 0.2);
-    path.quadraticBezierTo(
-        size.width * 0.25, size.height * 0.05, size.width, size.height * 0.15);
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }

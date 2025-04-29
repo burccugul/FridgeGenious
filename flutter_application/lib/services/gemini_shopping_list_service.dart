@@ -7,7 +7,7 @@ import 'package:logging/logging.dart';
 final Logger _logger = Logger('GeminiShoppingListService');
 
 class GeminiShoppingListService {
-  final String apiKey = "AIzaSyBfJAn7qJ_gKyLR4xBvTguQzY7nb_GtLjM";
+  final String apiKey = "AIzaSyBr_epn1mMGQMPnnTj14W7IyHcsS606kuw";
   late GenerativeModel model;
   final SupabaseHelper _supabaseHelper = SupabaseHelper();
 
@@ -32,7 +32,7 @@ class GeminiShoppingListService {
       }
 
       // Check if user is part of a family package
-      final userIDArray = '[\"$currentUserID\"]';
+      final userIDArray = '["$currentUserID"]';
       final familyPackagesResponse = await _supabaseHelper.client
           .from('family_packages')
           .select()

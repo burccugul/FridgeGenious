@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:developer';
+// Import our image service
+import '../services/recipe_image_service.dart';
 
 class RecipeDetailPage extends StatefulWidget {
   final Map<String, dynamic>? recipe;
@@ -16,8 +19,11 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   bool isDirectionsExpanded = true;
   bool isFavorite = false;
   bool isUpdating = false;
+  bool isLoadingImage = true;
+  String? recipeImageUrl;
   final _supabase = Supabase.instance.client;
   String? effectiveUserID;
+  final _imageService = RecipeImageService(); // Initialize our image service
 
   @override
   void initState() {
@@ -27,11 +33,70 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
       setState(() {
         isFavorite = widget.recipe!['is_favorite'] ?? false;
       });
+
+      // Fetch recipe image
+      _loadRecipeImage();
     }
+
     _getEffectiveUserID().then((_) {
       // Load favorite status after getting effective user ID
       _loadFavoriteStatus();
     });
+  }
+
+  // Load recipe image from Google Custom Search API
+  Future<void> _loadRecipeImage() async {
+    if (widget.recipe == null) return;
+
+    final recipeName = widget.recipe!['recipe_name'];
+    if (recipeName == null) return;
+
+    setState(() {
+      isLoadingImage = true;
+    });
+
+    try {
+      // First check if there's an image_url in the recipe data
+      final existingImageUrl = widget.recipe!['image_url'];
+      if (existingImageUrl != null && existingImageUrl.toString().isNotEmpty) {
+        setState(() {
+          recipeImageUrl = existingImageUrl;
+          isLoadingImage = false;
+        });
+        return;
+      }
+
+      // If no existing image URL, fetch from the image service
+      final imageUrl = await _imageService.getImageForRecipe(recipeName);
+
+      if (mounted) {
+        setState(() {
+          recipeImageUrl = imageUrl;
+          isLoadingImage = false;
+        });
+
+        // Optionally: Update the recipe in Supabase with the image URL
+        if (imageUrl != null && effectiveUserID != null) {
+          try {
+            await _supabase
+                .from('recipes')
+                .update({'image_url': imageUrl})
+                .eq('recipe_name', recipeName)
+                .eq('uuid_userid', effectiveUserID);
+            log('Updated recipe with image URL in database');
+          } catch (e) {
+            log('Failed to update image URL in database: $e');
+          }
+        }
+      }
+    } catch (e) {
+      log('Error loading recipe image: $e');
+      if (mounted) {
+        setState(() {
+          isLoadingImage = false;
+        });
+      }
+    }
   }
 
   // Sayfaya her geri dönüldüğünde çağrılacak
@@ -60,8 +125,8 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
           .limit(1);
 
       // Response formatını debug amaçlı yazdır
-      print('Response type: ${response.runtimeType}');
-      print('Response data: $response');
+      log('Response type: ${response.runtimeType}');
+      log('Response data: $response');
 
       // Doğru şekilde parse et
       if (response != null) {
@@ -70,20 +135,20 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
           setState(() {
             isFavorite = response[0]['is_favorite'] ?? false;
           });
-          print('Loaded favorite status from list: $isFavorite');
+          log('Loaded favorite status from list: $isFavorite');
         } else if (response is Map) {
           // Doğrudan bir Map ise
           setState(() {
             isFavorite = response['is_favorite'] ?? false;
           });
-          print('Loaded favorite status from map: $isFavorite');
+          log('Loaded favorite status from map: $isFavorite');
         } else {
-          print('Unknown response format: $response');
+          log('Unknown response format: $response');
         }
       }
     } catch (e) {
-      print('Error loading favorite status: $e');
-      print('Stack trace: ${StackTrace.current}');
+      log('Error loading favorite status: $e');
+      log('Stack trace: ${StackTrace.current}');
     }
   }
 
@@ -102,18 +167,16 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
         setState(() {
           effectiveUserID = familyPackage['owner_user_id'];
         });
-        print(
-            'User is part of family package: ${familyPackage['family_name']}');
-        print('Using family owner ID: $effectiveUserID');
+        log('User is part of family package: ${familyPackage['family_name']}');
+        log('Using family owner ID: $effectiveUserID');
       } else {
         setState(() {
           effectiveUserID = currentUserID;
         });
-        print(
-            'User is not part of any family package, using personal ID: $effectiveUserID');
+        log('User is not part of any family package, using personal ID: $effectiveUserID');
       }
     } catch (e) {
-      print('Error getting effective user ID: $e');
+      log('Error getting effective user ID: $e');
       setState(() {
         effectiveUserID = _supabase.auth.currentUser?.id;
       });
@@ -121,11 +184,11 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
   }
 
   Future<void> toggleFavorite() async {
-    print("Toggle favorite clicked"); // Debug print
+    log("Toggle favorite clicked"); // Debug print
 
     if (widget.recipe == null) return;
     if (effectiveUserID == null) {
-      print("No effective user ID found");
+      log("No effective user ID found");
       return;
     }
 
@@ -270,8 +333,8 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
       }
       // else: Başarısızlık mesajı zaten içeride gösteriliyor
     } catch (e) {
-      print('Error in _startCooking: $e');
-      print('Stack trace: ${StackTrace.current}');
+      log('Error in _startCooking: $e');
+      log('Stack trace: ${StackTrace.current}');
 
       if (mounted) {
         Navigator.of(context).pop(); // Remove loading dialog
@@ -424,7 +487,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
           }
         }
       } catch (e) {
-        print('Error updating shopping list: $e');
+        log('Error updating shopping list: $e');
       }
     }
 
@@ -573,34 +636,85 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                 ),
               ),
 
-              // Recipe Image - Using a placeholder or you can add image URL to your recipe data
+              // Recipe Image - Now showing from our image service
               Padding(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                 child: Container(
+                  height: 200,
+                  width: double.infinity,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
+                    color: const Color.fromARGB(255, 245, 245, 245),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(16),
-                    child: Image.network(
-                      recipe['image_url'] ??
-                          'https://via.placeholder.com/400x300',
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          height: 200,
-                          width: double.infinity,
-                          color: const Color.fromARGB(255, 175, 175, 172),
-                          child: const Center(
-                            child: Icon(Icons.restaurant,
-                                size: 50, color: Colors.grey),
-                          ),
-                        );
-                      },
-                    ),
+                    child: isLoadingImage
+                        ? const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Color.fromARGB(255, 241, 147, 7),
+                                  ),
+                                ),
+                                SizedBox(height: 12),
+                                Text(
+                                  "Loading recipe image...",
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : recipeImageUrl != null
+                            ? Image.network(
+                                recipeImageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  log('Error loading image: $error');
+                                  return Container(
+                                    color: const Color.fromARGB(
+                                        255, 175, 175, 172),
+                                    child: const Center(
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(Icons.restaurant,
+                                              size: 50, color: Colors.white),
+                                          SizedBox(height: 8),
+                                          Text(
+                                            "Image not available",
+                                            style:
+                                                TextStyle(color: Colors.white),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            : Container(
+                                color: const Color.fromARGB(255, 175, 175, 172),
+                                child: const Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.image_not_supported,
+                                          size: 50, color: Colors.white),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        "No image available",
+                                        style: TextStyle(color: Colors.white),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                   ),
                 ),
               ),
@@ -706,90 +820,56 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                       ),
                     ],
                   ),
-                  child: Theme(
-                    data: Theme.of(context).copyWith(
-                      dividerColor: Colors.transparent,
-                    ),
-                    child: ExpansionTile(
-                      initiallyExpanded: isIngredientsExpanded,
-                      onExpansionChanged: (expanded) {
-                        setState(() {
-                          isIngredientsExpanded = expanded;
-                        });
-                      },
-                      title: const Row(
-                        children: [
-                          Icon(
-                            Icons.restaurant_menu,
-                            color: Color.fromARGB(255, 241, 147, 7),
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Ingredients',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                      trailing: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: const Color.fromARGB(255, 241, 147, 7),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          isIngredientsExpanded
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      children: [
-                        Padding(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Ingredients Header with expand/collapse functionality
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            isIngredientsExpanded = !isIngredientsExpanded;
+                          });
+                        },
+                        child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              if (recipe['ingredients'] != null)
-                                ...List.generate(
-                                  (recipe['ingredients'] as List).length,
-                                  (i) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          '• ',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            color: Color.fromARGB(
-                                                255, 241, 147, 7),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            '${recipe['ingredients'][i]}',
-                                            style:
-                                                const TextStyle(fontSize: 16),
-                                          ),
-                                        ),
-                                      ],
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.shopping_basket,
+                                    color: Color.fromARGB(255, 241, 147, 7),
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Ingredients',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
+                                ],
+                              ),
+                              Icon(
+                                isIngredientsExpanded
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                                color: const Color.fromARGB(255, 241, 147, 7),
+                              ),
                             ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      // Ingredients List - Expanded or collapsed
+                      if (isIngredientsExpanded)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0, vertical: 8.0),
+                          child: _buildIngredientsList(recipe),
+                        ),
+                    ],
                   ),
                 ),
               ),
@@ -810,153 +890,269 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                       ),
                     ],
                   ),
-                  child: Theme(
-                    data: Theme.of(context).copyWith(
-                      dividerColor: Colors.transparent,
-                    ),
-                    child: ExpansionTile(
-                      initiallyExpanded: isDirectionsExpanded,
-                      onExpansionChanged: (expanded) {
-                        setState(() {
-                          isDirectionsExpanded = expanded;
-                        });
-                      },
-                      title: const Row(
-                        children: [
-                          Icon(
-                            Icons.menu_book,
-                            color: Color.fromARGB(255, 241, 147, 7),
-                            size: 20,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            'Direction',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black,
-                            ),
-                          ),
-                        ],
-                      ),
-                      trailing: Container(
-                        width: 30,
-                        height: 30,
-                        decoration: BoxDecoration(
-                          color: const Color.fromARGB(255, 241, 147, 7),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          isDirectionsExpanded
-                              ? Icons.keyboard_arrow_up
-                              : Icons.keyboard_arrow_down,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-                      children: [
-                        Padding(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Directions Header with expand/collapse functionality
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            isDirectionsExpanded = !isDirectionsExpanded;
+                          });
+                        },
+                        child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              if (recipe['steps'] != null)
-                                ...List.generate(
-                                  (recipe['steps'] as List).length,
-                                  (i) => Padding(
-                                    padding:
-                                        const EdgeInsets.only(bottom: 16.0),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(12),
-                                        border: Border.all(
-                                          color: const Color.fromARGB(
-                                              255, 255, 230, 149),
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Container(
-                                            width: 24,
-                                            height: 24,
-                                            decoration: const BoxDecoration(
-                                              color: Color.fromARGB(
-                                                  255, 241, 147, 7),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                '${i + 1}',
-                                                style: const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              '${recipe['steps'][i]}',
-                                              style:
-                                                  const TextStyle(fontSize: 16),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                              Row(
+                                children: [
+                                  const Icon(
+                                    Icons.menu_book,
+                                    color: Color.fromARGB(255, 241, 147, 7),
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text(
+                                    'Directions',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
-                                ),
+                                ],
+                              ),
+                              Icon(
+                                isDirectionsExpanded
+                                    ? Icons.keyboard_arrow_up
+                                    : Icons.keyboard_arrow_down,
+                                color: const Color.fromARGB(255, 241, 147, 7),
+                              ),
                             ],
                           ),
                         ),
-                        // Start Cooking Button
+                      ),
+                      // Directions List - Expanded or collapsed
+                      if (isDirectionsExpanded)
                         Padding(
-                          padding: const EdgeInsets.all(16.0),
-                          child: ElevatedButton(
-                            onPressed: _startCooking,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  const Color.fromARGB(255, 241, 147, 7),
-                              foregroundColor: Colors.white,
-                              minimumSize: const Size(double.infinity, 50),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 3,
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.play_circle_filled, size: 24),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Start cooking',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0, vertical: 8.0),
+                          child: _buildDirectionsList(recipe),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
                 ),
               ),
 
-              const SizedBox(height: 24),
+              // Start Cooking Button
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _startCooking,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color.fromARGB(255, 241, 147, 7),
+                      padding: const EdgeInsets.symmetric(vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 5,
+                    ),
+                    child: const Text(
+                      'Start Cooking',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  // Function to build ingredients list
+  Widget _buildIngredientsList(Map<String, dynamic> recipe) {
+    // Filter recipe data to get only ingredients items
+    final List<Map<String, dynamic>> ingredients = [];
+    if (recipe['ingredients'] != null && recipe['ingredients'] is List) {
+      for (var item in recipe['ingredients']) {
+        if (item is Map<String, dynamic>) {
+          ingredients.add(item);
+        } else if (item is String) {
+          // Handle string format if your data might be in that format
+          ingredients.add({'name': item, 'quantity': '1', 'unit': ''});
+        }
+      }
+    } else {
+      // If ingredients aren't in a nested structure, check for food_name and quantity fields
+      if (recipe['food_name'] != null) {
+        ingredients.add({
+          'name': recipe['food_name'],
+          'quantity': recipe['quantity'] ?? '1',
+          'unit': recipe['unit'] ?? ''
+        });
+      }
+    }
+
+    if (ingredients.isEmpty) {
+      // Fallback for when we can't parse ingredients properly
+      return const Padding(
+        padding: EdgeInsets.all(12.0),
+        child: Text(
+          'No ingredients information available.',
+          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+        ),
+      );
+    }
+
+    return Column(
+      children: ingredients.map((ingredient) {
+        // Try to extract ingredient information with fallbacks
+        final name = ingredient['name'] ??
+            ingredient['food_name'] ??
+            'Unknown ingredient';
+        final quantity = ingredient['quantity'] ?? '1';
+        final unit = ingredient['unit'] ?? '';
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6.0),
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color.fromARGB(255, 241, 147, 7),
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '$quantity ${unit.isNotEmpty ? '$unit ' : ''}$name',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  // Function to build directions list
+  Widget _buildDirectionsList(Map<String, dynamic> recipe) {
+    // Try to extract directions from recipe
+    List<String> directions = [];
+
+    if (recipe['directions'] != null) {
+      if (recipe['directions'] is List) {
+        for (var direction in recipe['directions']) {
+          if (direction is String) {
+            directions.add(direction);
+          } else if (direction is Map && direction['step'] != null) {
+            directions.add(direction['step'].toString());
+          }
+        }
+      } else if (recipe['directions'] is String) {
+        // If directions is a single string, split by periods or newlines
+        String dirText = recipe['directions'];
+        if (dirText.contains('\n')) {
+          directions = dirText
+              .split('\n')
+              .where((step) => step.trim().isNotEmpty)
+              .toList();
+        } else {
+          directions = dirText
+              .split('.')
+              .where((step) => step.trim().isNotEmpty)
+              .map((step) => '${step.trim()}.')
+              .toList();
+        }
+      }
+    } else if (recipe['steps'] != null) {
+      // Alternative field name
+      if (recipe['steps'] is List) {
+        for (var step in recipe['steps']) {
+          if (step is String) {
+            directions.add(step);
+          } else if (step is Map && step['instruction'] != null) {
+            directions.add(step['instruction'].toString());
+          }
+        }
+      } else if (recipe['steps'] is String) {
+        String stepsText = recipe['steps'];
+        if (stepsText.contains('\n')) {
+          directions = stepsText
+              .split('\n')
+              .where((step) => step.trim().isNotEmpty)
+              .toList();
+        } else {
+          directions = stepsText
+              .split('.')
+              .where((step) => step.trim().isNotEmpty)
+              .map((step) => '${step.trim()}.')
+              .toList();
+        }
+      }
+    }
+
+    if (directions.isEmpty) {
+      // Fallback text
+      return const Padding(
+        padding: EdgeInsets.all(12.0),
+        child: Text(
+          'No cooking directions available.',
+          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: directions.asMap().entries.map((entry) {
+        final index = entry.key;
+        final direction = entry.value;
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 24,
+                height: 24,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Color.fromARGB(255, 241, 147, 7),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '${index + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  direction,
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 }
