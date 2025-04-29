@@ -182,6 +182,255 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
     }
   }
 
+  // First, add this function to the _RecipeDetailPageState class
+
+  Future<void> _startCooking() async {
+    // Show warning dialog
+    final shouldProceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start Cooking?'),
+        content: const Text(
+          'The ingredients used in this recipe will be removed from your inventory. Do you want to proceed?',
+          style: TextStyle(fontSize: 16),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.black54,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 241, 147, 7),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Proceed',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldProceed != true) return;
+
+    // Show loading indicator
+    if (!mounted) return;
+    _showLoadingDialog();
+
+    try {
+      if (widget.recipe == null)
+        throw Exception('Recipe details not available');
+      if (effectiveUserID == null) throw Exception('User ID not found');
+
+      final recipeName = widget.recipe!['recipe_name'];
+      if (recipeName == null) throw Exception('Recipe name not found');
+
+      final recipeIngredientsResponse = await _supabase
+          .from('recipes')
+          .select('food_name, quantity')
+          .eq('recipe_name', recipeName)
+          .eq('uuid_userid', effectiveUserID);
+
+      if (recipeIngredientsResponse == null ||
+          recipeIngredientsResponse is! List ||
+          recipeIngredientsResponse.isEmpty) {
+        throw Exception('No ingredients found for this recipe');
+      }
+
+      // Remove ingredients and check if it was successful
+      final success =
+          await _removeIngredientsFromInventory(recipeIngredientsResponse);
+
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Remove loading dialog
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ingredients have been removed from your inventory'),
+            backgroundColor: Color.fromARGB(255, 241, 147, 7),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      // else: Başarısızlık mesajı zaten içeride gösteriliyor
+    } catch (e) {
+      print('Error in _startCooking: $e');
+      print('Stack trace: ${StackTrace.current}');
+
+      if (mounted) {
+        Navigator.of(context).pop(); // Remove loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+// Helper function to show a loading dialog
+  void _showLoadingDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Color.fromARGB(255, 241, 147, 7),
+              ),
+            ),
+            SizedBox(height: 16),
+            Text('Updating inventory...'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _removeIngredientsFromInventory(List recipeIngredients) async {
+    if (effectiveUserID == null) return false;
+
+    final inventoryResponse = await _supabase
+        .from('inventory')
+        .select()
+        .eq('uuid_userid', effectiveUserID);
+
+    if (inventoryResponse == null || inventoryResponse is! List) {
+      throw Exception('Failed to retrieve inventory');
+    }
+
+    final inventoryMap = {
+      for (var item in inventoryResponse)
+        item['food_name'].toString().toLowerCase(): item
+    };
+
+    bool hasZeroQuantityIngredient = false;
+    List<String> zeroQuantityIngredients = [];
+
+    for (final ingredient in recipeIngredients) {
+      final foodName = ingredient['food_name'].toString().toLowerCase();
+
+      if (inventoryMap.containsKey(foodName)) {
+        final inventoryItem = inventoryMap[foodName];
+        final currentQuantity =
+            int.tryParse('${inventoryItem['quantity']}') ?? 0;
+
+        if (currentQuantity == 0) {
+          hasZeroQuantityIngredient = true;
+          zeroQuantityIngredients.add(foodName);
+        }
+      } else {
+        hasZeroQuantityIngredient = true;
+        zeroQuantityIngredients.add(foodName);
+      }
+    }
+
+    if (hasZeroQuantityIngredient) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Cannot reduce ingredients: Some required ingredients have zero quantity: ${zeroQuantityIngredients.join(", ")}',
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return false;
+    }
+
+    final updates = <Future>[];
+    final updatedIngredients = <String>[];
+    final today = DateTime.now().toIso8601String().split('T')[0];
+    final shoppingListItems = <Map<String, dynamic>>[];
+
+    for (final ingredient in recipeIngredients) {
+      final foodName = ingredient['food_name'].toString().toLowerCase();
+      final recipeQuantity = ingredient['quantity'] ?? 1;
+
+      final inventoryItem = inventoryMap[foodName];
+      final currentQuantity = int.tryParse('${inventoryItem['quantity']}') ?? 0;
+      final recipeQty = int.tryParse('$recipeQuantity') ?? 1;
+      final newQuantity = currentQuantity - recipeQty;
+
+      final update = _supabase
+          .from('inventory')
+          .update({'quantity': newQuantity})
+          .eq('food_name', inventoryItem['food_name'])
+          .eq('uuid_userid', effectiveUserID);
+
+      updates.add(update);
+      updatedIngredients.add(foodName);
+
+      if (newQuantity == 0) {
+        shoppingListItems.add({
+          'food_name': inventoryItem['food_name'],
+          'remove_date': today,
+          'consumation_rate_by_week': 1,
+          'uuid_userid': effectiveUserID,
+        });
+      }
+    }
+
+    if (updates.isNotEmpty) {
+      await Future.wait(updates);
+    }
+
+    if (shoppingListItems.isNotEmpty) {
+      try {
+        for (final item in shoppingListItems) {
+          final existingItems = await _supabase
+              .from('shoppinglist')
+              .select()
+              .eq('food_name', item['food_name'])
+              .eq('uuid_userid', effectiveUserID);
+
+          if (existingItems is List && existingItems.isEmpty) {
+            await _supabase.from('shoppinglist').insert(item);
+          } else {
+            await _supabase
+                .from('shoppinglist')
+                .update({
+                  'remove_date': today,
+                  'consumation_rate_by_week': (int.tryParse(
+                              '${existingItems[0]['consumation_rate_by_week']}') ??
+                          0) +
+                      1
+                })
+                .eq('food_name', item['food_name'])
+                .eq('uuid_userid', effectiveUserID);
+          }
+        }
+      } catch (e) {
+        print('Error updating shopping list: $e');
+      }
+    }
+
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final recipe = widget.recipe;
@@ -670,7 +919,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
                         Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: ElevatedButton(
-                            onPressed: () {},
+                            onPressed: _startCooking,
                             style: ElevatedButton.styleFrom(
                               backgroundColor:
                                   const Color.fromARGB(255, 241, 147, 7),

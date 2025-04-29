@@ -112,15 +112,45 @@ class GeminiService {
           _logger.info("Processing: $foodName, $quantity, $expirationDate");
 
           try {
-            await _supabaseHelper.client.from('inventory').upsert({
-              'food_name': foodName,
-              'quantity': quantity,
-              'last_image_upload': currentDateTime,
-              'expiration_date': expirationDate,
-              'uuid_userid': effectiveUserID,
-            });
+            // Aynı kullanıcı ve aynı food_name varsa mevcut kaydı al
+            final existingRecords = await _supabaseHelper.client
+                .from('inventory')
+                .select()
+                .eq('food_name', foodName)
+                .eq('uuid_userid', effectiveUserID);
 
-            _logger.info("✅ Upserted item: $foodName, quantity: $quantity");
+            if (existingRecords != null && existingRecords.isNotEmpty) {
+              final existing = existingRecords[0];
+              int existingQuantity =
+                  int.tryParse(existing['quantity'].toString()) ?? 0;
+              int updatedQuantity = existingQuantity + quantity;
+
+              await _supabaseHelper.client
+                  .from('inventory')
+                  .update({
+                    'quantity': updatedQuantity.toString(),
+                    'last_image_upload': currentDateTime,
+                    'expiration_date': expirationDate,
+                  })
+                  .eq('food_name', foodName)
+                  .eq('uuid_userid', effectiveUserID);
+
+              _logger.info(
+                  "✅ Updated item: $foodName, quantity: $updatedQuantity");
+            } else {
+              // Eğer kayıt yoksa yeni kayıt ekle
+              await _supabaseHelper.client.from('inventory').insert({
+                'food_name': foodName,
+                'quantity': quantity.toString(),
+                'last_image_upload': currentDateTime,
+                'expiration_date': expirationDate,
+                'uuid_userid': effectiveUserID,
+              });
+
+              _logger
+                  .info("✅ Inserted new item: $foodName, quantity: $quantity");
+            }
+
             processedItems++;
           } catch (e) {
             _logger.severe("❌ Error saving item to database: $e");

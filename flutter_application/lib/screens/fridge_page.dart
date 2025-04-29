@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:logging/logging.dart';
 import 'package:intl/intl.dart'; // Add this import for date formatting
+import 'package:flutter_application/screens/special_recipe_page.dart';
 
 final Logger _logger = Logger('FridgeApp');
 
@@ -24,19 +25,32 @@ class FridgePageState extends State<FridgePage> {
   final Map<String, String> emojiMap = {
     'Apple': '🍎',
     'Banana': '🍌',
-    'Grape': '🍇',
+    'Grapes': '🍇',
     'Orange': '🍊',
     'Strawberry': '🍓',
-    'Potato': '🥔',
+    'Blueberry': '🫐',
+    'Pineapple': '🍍',
+    'Watermelon': '🍉',
+    'Lemon': '🍋',
+    'Peach': '🍑',
+    'Mango': '🥭',
+    'Kiwi': '🥝',
+    'Melon': '🍈',
+    'Cherry': '🍒',
+    'Coconut': '🥥',
+    'Tomato': '🍅',
+    'Avocado': '🥑',
+    'Cucumber': '🥒',
     'Carrot': '🥕',
     'Broccoli': '🥦',
-    'Onion': '🧅',
-    'Garlic': '🧄',
-    'Tomato': '🍅',
-    'Eggplant': '🍆',
     'Corn': '🌽',
     'Lettuce': '🥬',
+    'Onion': '🧅',
+    'Garlic': '🧄',
     'Mushroom': '🍄',
+    'Potato': '🥔',
+    'Eggplant': '🍆',
+    'Pumpkin': '🎃',
     'Cheese': '🧀',
     'Milk': '🥛',
     'Butter': '🧈',
@@ -45,28 +59,86 @@ class FridgePageState extends State<FridgePage> {
     'Fish': '🐟',
     'Meat': '🥩',
     'Chicken': '🍗',
+    'Bacon': '🥓',
+    'Shrimp': '🦐',
+    'Crab': '🦀',
+    'Lobster': '🦞',
     'Rice': '🍚',
-    'Bread': '🍞',
-    'Pasta': '🍝',
-    'Peanut Butter': '🥜',
-    'Jam': '🍯',
-    'Honey': '🍯',
-    'Chili Pepper': '🌶️',
-    'Cucumber': '🥒',
-    'Pumpkin': '🎃',
-    'Blueberry': '🫐',
-    'Fig': '🍇',
-    'Apricot': '🍑',
-    'Kiwi': '🥝',
     'Curry': '🍛',
-    'Hazelnut': '🌰',
+    'Spaghetti': '🍝',
+    'Stew': '🍲',
+    'Salad': '🥗',
+    'Sandwich': '🥪',
+    'Hamburger': '🍔',
+    'Pizza': '🍕',
+    'Fries': '🍟',
+    'Hot Dog': '🌭',
+    'Taco': '🌮',
+    'Burrito': '🌯',
+    'Sushi': '🍣',
+    'Dumpling': '🥟',
+    'Ramen': '🍜',
+    'Bread': '🍞',
+    'Croissant': '🥐',
+    'Baguette': '🥖',
+    'Pretzel': '🥨',
+    'Bagel': '🥯',
+    'Pancakes': '🥞',
+    'Waffle': '🧇',
+    'Honey': '🍯',
+    'Jam': '🍯',
+    'Peanut Butter': '🥜',
+    'Nuts': '🌰',
     'Bean': '🫘',
-    'Peanut': '🥜',
-    'Raisin': '🍇',
-    'Juice': '🧃',
+    'Ice Cream': '🍨',
+    'Cake': '🍰',
+    'Cupcake': '🧁',
+    'Chocolate': '🍫',
+    'Cookie': '🍪',
+    'Doughnut': '🍩',
+    'Popcorn': '🍿',
+    'Candy': '🍬',
+    'Lollipop': '🍭',
+    'Pie': '🥧',
+    'Chili Pepper': '🌶️',
+    'Herbs': '🌿',
     'Basil': '🌿',
+    'Juice': '🧃',
+    'Soda': '🥤',
+    'Coffee': '☕',
+    'Tea': '🍵',
+    'Bubble Tea': '🧋',
+    'Beer': '🍺',
+    'Wine': '🍷',
+    'Cocktail': '🍸',
+    'Tumbler': '🥃',
+    'Champagne': '🍾',
+    'Bottle': '🍼',
+    'Fork and Knife': '🍴',
+    'Spoon': '🥄',
+    'Apricot': '🍑',
+    'Ham': '🥓',
+    'Grapefruit': '🍊',
+    'Ginger': '🫚',
+    'Almond': '🌰',
+    'Spinach': '🥬',
     'Pepper': '🌶️',
-    'Ginger': '🧄',
+    'Dried Apricot': '🍑',
+    'Oat': '🌾',
+    'Fig': '🍈',
+    'Salmon': '🐟',
+    'Preserved Ginger': '🫚',
+    'Cardamom': '🌿',
+    'Peppercorn': '🌶️',
+    'Pasta': '🍝',
+    'Raisin': '🍇',
+    'Grape': '🍇',
+    'Noodle': '🍜',
+    'Flaxseed': '🌾',
+    'Orange Juice': '🍊',
+    'Pomegranate': '🍎',
+    'Peanut': '🥜',
+    'Hazelnut': '🌰'
   };
 
   @override
@@ -74,7 +146,6 @@ class FridgePageState extends State<FridgePage> {
     super.initState();
     _getEffectiveUserID().then((_) => fetchInventory());
   }
-
 
   // Yeni öğe ekleme fonksiyonu
   Future<void> addItemToInventory() async {
@@ -104,13 +175,14 @@ class FridgePageState extends State<FridgePage> {
 
       if (response != null) {
         _logger.info('Item added to inventory: $foodName');
-        fetchInventory();  // Envanteri güncelle
+        fetchInventory(); // Envanteri güncelle
       }
     } catch (e) {
       _logger.severe('Error adding item: $e');
     }
   }
-   Future<void> _selectExpirationDate(BuildContext context) async {
+
+  Future<void> _selectExpirationDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -123,6 +195,7 @@ class FridgePageState extends State<FridgePage> {
         selectedExpirationDate = picked;
       });
   }
+
   // Get the actual user ID to use (considering family package)
   Future<void> _getEffectiveUserID() async {
     try {
@@ -177,7 +250,7 @@ class FridgePageState extends State<FridgePage> {
           int quantity = int.tryParse(item['quantity'].toString()) ?? 0;
           return {
             'name': foodName,
-            'emoji': emojiMap[foodName] ?? '❓',
+            'emoji': emojiMap[foodName] ?? '🍽️',
             'quantity': quantity,
             'selected': false,
           };
@@ -196,13 +269,13 @@ class FridgePageState extends State<FridgePage> {
         return;
       }
       // UI'yi hemen güncelle
-    setState(() {
-      final index = inventoryItems.indexWhere((item) => item['name'] == foodName);
-      if (index != -1) {
-        inventoryItems[index]['quantity'] = newQuantity;
-      }
-    });
-
+      setState(() {
+        final index =
+            inventoryItems.indexWhere((item) => item['name'] == foodName);
+        if (index != -1) {
+          inventoryItems[index]['quantity'] = newQuantity;
+        }
+      });
 
       if (newQuantity <= 0) {
         await supabase.from('shoppinglist').insert({
@@ -238,116 +311,171 @@ class FridgePageState extends State<FridgePage> {
 
   void toggleIngredient(int index) {
     setState(() {
-      inventoryItems[index]['selected'] = !inventoryItems[index]['selected'];
+      // Only toggle the ingredient if the quantity is greater than 0
+      if (inventoryItems[index]['quantity'] > 0) {
+        inventoryItems[index]['selected'] = !inventoryItems[index]['selected'];
+      }
     });
   }
 
-  @override
-Widget build(BuildContext context) {
-  return Scaffold(
-    appBar: AppBar(
-      title: const Text("What's In Your Fridge"),
-    ),
-    body: isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: foodController,
-                        decoration: InputDecoration(
-                          labelText: "Enter food name",
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: () => _showAddItemDialog(context),
-                    ),
-                  ],
-                ),
-              ),
-              inventoryItems.isEmpty
-                  ? const Center(child: Text('You have no items in your fridge.'))
-                  : Expanded(
-                      child: GridView.builder(
-                        padding: const EdgeInsets.all(16.0),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 2,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                        ),
-                        itemCount: inventoryItems.length,
-                        itemBuilder: (context, index) {
-                          final ingredient = inventoryItems[index];
-                          final expirationDate = ingredient['expiration_date'] != null
-                              ? DateTime.tryParse(ingredient['expiration_date'])?.toLocal()
-                              : null;
-                          final expirationDateFormatted = expirationDate != null
-                              ? DateFormat('yyyy-MM-dd').format(expirationDate)
-                              : null;
+  // Property to track the count of selected ingredients
+  int get selectedIngredientsCount =>
+      inventoryItems.where((item) => item['selected'] == true).length;
 
-                          return GestureDetector(
-                            onTap: () => toggleIngredient(index),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: ingredient['selected']
-                                      ? Colors.blue
-                                      : Colors.blue[100]!,
-                                  width: ingredient['selected'] ? 2 : 1,
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(ingredient['emoji'], style: const TextStyle(fontSize: 40)),
-                                  const SizedBox(height: 8),
-                                  Text(ingredient['name'], style: const TextStyle(fontSize: 16)),
-                                  if (expirationDateFormatted != null)
-                                    Text(
-                                      'Expires on: $expirationDateFormatted',
-                                      style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                    ),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.remove),
-                                        onPressed: () {
-                                          if (ingredient['quantity'] > 0) {
-                                            int newQuantity = ingredient['quantity'] - 1;
-                                            updateQuantity(ingredient['name'], newQuantity);
-                                          }
-                                        },
-                                      ),
-                                      Text('${ingredient['quantity']}', style: const TextStyle(fontSize: 16)),
-                                      IconButton(
-                                        icon: const Icon(Icons.add),
-                                        onPressed: () {
-                                          int newQuantity = ingredient['quantity'] + 1;
-                                          updateQuantity(ingredient['name'], newQuantity);
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+  // Navigate to SpecialRecipePage with selected ingredients
+  void _navigateToSpecialRecipe() {
+    final selectedIngredients = inventoryItems
+        .where((item) => item['selected'] == true)
+        .map((item) => item['name'].toString())
+        .toList();
+
+    if (selectedIngredients.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Please select at least one ingredient')));
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SpecialRecipePage(
+          selectedIngredients: selectedIngredients,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("What's In Your Fridge"),
+      ),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: foodController,
+                          decoration: InputDecoration(
+                            labelText: "Enter food name",
+                          ),
+                        ),
                       ),
-                    ),
-            ],
-          ),
-  );
-}
+                      IconButton(
+                        icon: const Icon(Icons.add),
+                        onPressed: () => _showAddItemDialog(context),
+                      ),
+                    ],
+                  ),
+                ),
+                inventoryItems.isEmpty
+                    ? const Center(
+                        child: Text('You have no items in your fridge.'))
+                    : Expanded(
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(16.0),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 16,
+                            mainAxisSpacing: 16,
+                          ),
+                          itemCount: inventoryItems.length,
+                          itemBuilder: (context, index) {
+                            final ingredient = inventoryItems[index];
+                            final expirationDate =
+                                ingredient['expiration_date'] != null
+                                    ? DateTime.tryParse(
+                                            ingredient['expiration_date'])
+                                        ?.toLocal()
+                                    : null;
+                            final expirationDateFormatted =
+                                expirationDate != null
+                                    ? DateFormat('yyyy-MM-dd')
+                                        .format(expirationDate)
+                                    : null;
+
+                            return GestureDetector(
+                              onTap: () => toggleIngredient(index),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: ingredient['selected']
+                                        ? Colors.orangeAccent
+                                        : Colors.blue[100]!,
+                                    width: ingredient['selected'] ? 2 : 1,
+                                  ),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(ingredient['emoji'],
+                                        style: const TextStyle(fontSize: 40)),
+                                    const SizedBox(height: 8),
+                                    Text(ingredient['name'],
+                                        style: const TextStyle(fontSize: 16)),
+                                    if (expirationDateFormatted != null)
+                                      Text(
+                                        'Expires on: $expirationDateFormatted',
+                                        style: const TextStyle(
+                                            fontSize: 12, color: Colors.grey),
+                                      ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.remove),
+                                          onPressed: () {
+                                            if (ingredient['quantity'] > 0) {
+                                              int newQuantity =
+                                                  ingredient['quantity'] - 1;
+                                              updateQuantity(ingredient['name'],
+                                                  newQuantity);
+                                            }
+                                          },
+                                        ),
+                                        Text('${ingredient['quantity']}',
+                                            style:
+                                                const TextStyle(fontSize: 16)),
+                                        IconButton(
+                                          icon: const Icon(Icons.add),
+                                          onPressed: () {
+                                            int newQuantity =
+                                                ingredient['quantity'] + 1;
+                                            updateQuantity(ingredient['name'],
+                                                newQuantity);
+                                          },
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+              ],
+            ),
+      floatingActionButton: selectedIngredientsCount > 0
+          ? FloatingActionButton.extended(
+              onPressed: () => _navigateToSpecialRecipe(),
+              label: Text('Get Recipe ($selectedIngredientsCount)'),
+              icon: Icon(Icons.restaurant_menu),
+              backgroundColor: const Color.fromARGB(255, 241, 147, 7),
+            )
+          : null,
+    );
+  }
 
   // Dialog göstererek kullanıcıdan bilgi al
   void _showAddItemDialog(BuildContext context) {

@@ -2,7 +2,6 @@ import 'package:google_generative_ai/google_generative_ai.dart';
 import '/database/supabase_helper.dart';
 import 'dart:convert';
 import 'package:logging/logging.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 final Logger _logger = Logger('GeminiRecipeService');
 
@@ -30,7 +29,7 @@ class GeminiRecipeService {
         _logger.warning('No current user found');
         return null;
       }
-      final userIDArray = '[\"$currentUserID\"]';
+      final userIDArray = '["$currentUserID"]';
       final familyPackagesResponse = await _supabaseHelper.client
           .from('family_packages')
           .select()
@@ -78,7 +77,7 @@ class GeminiRecipeService {
 
     String prompt = '''Generate a recipe using the following ingredients: 
 ${ingredients.join(', ')}. 
-Don't have to use all of them but recipe's ingredients should be all in this list. 
+You don't have to use all of foods in inventory for recipe but recipe's ingredients should be all in this list, do not add any other. 
 The recipe should include the all ingredients and all detailed steps.
 Show recipe name, ingredients, and steps in the format: RecipeName, Ingredient1, Ingredient2, ..., Step1, Step2, ..., time.
 Do not write other things from there. 
@@ -93,14 +92,10 @@ Respond ONLY in JSON format, like this:
 ''';
 
     try {
-      final responses = model.generateContentStream([
-        Content.multi([TextPart(prompt)])
-      ]);
+      final response = await model.generateContent([Content.text(prompt)]);
 
-      String aiResponse = '';
-      await for (final response in responses) {
-        aiResponse += response.text ?? '';
-      }
+      final aiResponse = response.text ?? '';
+      _logger.info("Raw AI JSON Response: $aiResponse");
 
       _logger.info("Raw AI JSON Response: $aiResponse");
 

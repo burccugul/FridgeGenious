@@ -7,9 +7,8 @@ import 'settings_page.dart';
 import '../services/gemini_image_service.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+import 'dart:developer';
 import 'package:flutter_application/database/supabase_helper.dart'; // Updated import
-
-
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,17 +19,15 @@ class HomePage extends StatefulWidget {
 
 class HomePageState extends State<HomePage> {
   int _currentIndex = 0;
-String fullName = '';
-bool isFamilyMember = false;
-String? familyId;
-bool isLoading = true;
-
+  String fullName = '';
+  bool isFamilyMember = false;
+  String? familyId;
+  bool isLoading = true;
 
   final List<IconData> _icons = [
     Icons.home,
     Icons.camera_alt_outlined,
     Icons.settings,
-    
   ];
 
   final ImagePicker _picker = ImagePicker();
@@ -53,8 +50,11 @@ bool isLoading = true;
                 onTap: () async {
                   final image =
                       await _picker.pickImage(source: ImageSource.camera);
-                  Navigator.pop(
-                      context, image == null ? null : File(image.path));
+
+                  if (context.mounted) {
+                    Navigator.pop(
+                        context, image == null ? null : File(image.path));
+                  }
                 },
               ),
               ListTile(
@@ -62,8 +62,10 @@ bool isLoading = true;
                 onTap: () async {
                   final image =
                       await _picker.pickImage(source: ImageSource.gallery);
-                  Navigator.pop(
-                      context, image == null ? null : File(image.path));
+                  if (context.mounted) {
+                    Navigator.pop(
+                        context, image == null ? null : File(image.path));
+                  }
                 },
               ),
             ],
@@ -112,7 +114,7 @@ bool isLoading = true;
         inventoryItems = inventory;
       });
     } catch (e) {
-      print('Error fetching inventory: $e');
+      log('Error fetching inventory: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to fetch inventory data')),
@@ -121,34 +123,33 @@ bool isLoading = true;
     }
   }
 
- @override
-void initState() {
-  super.initState();
-  _supabaseHelper.initialize().then((_) {
-    fetchInventory();
-    fetchUserProfile(); // Kullanıcı bilgisini çekiyoruz
-  }).catchError((error) {
-    print('Failed to initialize Supabase: $error');
-  });
-}
-  
+  @override
+  void initState() {
+    super.initState();
+    _supabaseHelper.initialize().then((_) {
+      fetchInventory();
+      fetchUserProfile(); // Kullanıcı bilgisini çekiyoruz
+    }).catchError((error) {
+      log('Failed to initialize Supabase: $error');
+    });
+  }
 
-Future<void> fetchUserProfile() async {
-  final userId = await SupabaseHelper().getCurrentUserId();
+  Future<void> fetchUserProfile() async {
+    final userId = await SupabaseHelper().getCurrentUserId();
 
-  if (userId != null) {
-    final profile = await SupabaseHelper().getUserProfile(userId);
+    if (userId != null) {
+      final profile = await SupabaseHelper().getUserProfile(userId);
 
-    if (profile != null) {
-      setState(() {
-        fullName = profile['full_name'] ?? '';
-        isFamilyMember = profile['is_family_member'] ?? false;
-        familyId = profile['family_id'];
-        isLoading = false;
-      });
+      if (profile != null) {
+        setState(() {
+          fullName = profile['full_name'] ?? '';
+          isFamilyMember = profile['is_family_member'] ?? false;
+          familyId = profile['family_id'];
+          isLoading = false;
+        });
+      }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -165,7 +166,7 @@ Future<void> fetchUserProfile() async {
               icon: Icon(Icons.logout, color: Colors.black87),
               onPressed: () async {
                 await _supabaseHelper.client.auth.signOut();
-                if (mounted) {
+                if (context.mounted) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -198,17 +199,17 @@ Future<void> fetchUserProfile() async {
                   children: [
                     const SizedBox(height: 20),
                     Align(
-                     alignment: Alignment.centerLeft,
-                     child: Text(
-                     'Hey, ${fullName ?? 'User'}${isFamilyMember ? ' (Family Account)' : ''}',
-                      style: TextStyle(
-                      fontSize: 32,
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'Hey, ${fullName ?? 'User'}${isFamilyMember ? ' (Family Account)' : ''}',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
                     ),
-                     ),
-                    ),  
                     const SizedBox(height: 10),
                     Align(
                       alignment: Alignment.centerLeft,
@@ -240,7 +241,7 @@ Future<void> fetchUserProfile() async {
                             textColor: Colors.black,
                             onPressed: () async {
                               await fetchInventory();
-                              if (mounted) {
+                              if (context.mounted) {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
