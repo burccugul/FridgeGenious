@@ -7,10 +7,10 @@ class FamilyPackagePage extends StatefulWidget {
   const FamilyPackagePage({super.key});
 
   @override
-  _FamilyPackagePageState createState() => _FamilyPackagePageState();
+  FamilyPackagePageState createState() => FamilyPackagePageState();
 }
 
-class _FamilyPackagePageState extends State<FamilyPackagePage> {
+class FamilyPackagePageState extends State<FamilyPackagePage> {
   final _emailController = TextEditingController();
   final _familyNameController = TextEditingController();
   List<String> emailList = [];
@@ -55,7 +55,7 @@ class _FamilyPackagePageState extends State<FamilyPackagePage> {
       final response = await supabase
           .from('family_packages')
           .select('id, family_name, member_user_ids, owner_user_id')
-          .or('owner_user_id.eq.$currentUserId,member_user_ids.cs.[\"$currentUserId\"]');
+          .or('owner_user_id.eq.$currentUserId,member_user_ids.cs.["$currentUserId"]');
 
       final families = List<Map<String, dynamic>>.from(response);
 
