@@ -305,7 +305,7 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
 
       final recipeIngredientsResponse = await _supabase
           .from('recipes')
-          .select('food_name, quantity')
+          .select('food_name')
           .eq('recipe_name', recipeName)
           .eq('uuid_userid', effectiveUserID);
 

@@ -140,7 +140,7 @@ class HomePageState extends State<HomePage> {
     if (userId != null) {
       final profile = await SupabaseHelper().getUserProfile(userId);
 
-      if (profile != null) {
+      if (profile != null && mounted) {
         setState(() {
           fullName = profile['full_name'] ?? '';
           isFamilyMember = profile['is_family_member'] ?? false;
