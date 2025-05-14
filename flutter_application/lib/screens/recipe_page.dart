@@ -8,7 +8,10 @@ import 'package:flutter_application/screens/home_page.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RecipePage extends StatefulWidget {
-  const RecipePage({super.key});
+  final Future<void> Function()
+      pickImage; // pickImage fonksiyonunu burada alıyoruz
+
+  RecipePage({super.key, required this.pickImage});
 
   @override
   State<RecipePage> createState() => _RecipePageState();
@@ -190,9 +193,10 @@ class _RecipePageState extends State<RecipePage>
     });
 
     try {
+      // Select steps verisini de ekleyin
       final response = await _supabase
           .from('recipes')
-          .select()
+          .select('*, steps') // steps alanını da sorguya ekledik
           .eq('uuid_userid', effectiveUserID)
           .eq('is_favorite', true)
           .order('recipe_name', ascending: true);
@@ -281,6 +285,37 @@ class _RecipePageState extends State<RecipePage>
           isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> toggleFavoriteStatus(
+      String recipeName, bool currentStatus) async {
+    final newStatus = !currentStatus;
+
+    try {
+      final updatedRows = await _supabase
+          .from('recipes')
+          .update({'is_favorite': newStatus})
+          .eq('uuid_userid', effectiveUserID)
+          .eq('recipe_name', recipeName)
+          .select(); // select() eklenmeli ki veriyi geri döndürsün
+
+      if (updatedRows.isNotEmpty) {
+        print('Favorite status updated to $newStatus for $recipeName');
+
+        // Local listeyi güncelle
+        setState(() {
+          final index =
+              favoriteRecipes.indexWhere((r) => r['recipe_name'] == recipeName);
+          if (index != -1) {
+            favoriteRecipes[index]['is_favorite'] = newStatus;
+          }
+        });
+      } else {
+        print('No rows updated');
+      }
+    } catch (e) {
+      print('Error updating favorite status: $e');
     }
   }
 
@@ -858,10 +893,14 @@ class _RecipePageState extends State<RecipePage>
                                                 item != null && item.isNotEmpty)
                                             .toList();
 
+                                        final steps = firstRow['steps'];
+
                                         final fullRecipe = {
                                           'recipe_name': recipeName,
                                           'time_minutes': firstRow['time'],
                                           'ingredients': ingredients,
+                                          'steps':
+                                              steps, // steps verisini ekledik
                                         };
 
                                         Navigator.push(
@@ -982,14 +1021,29 @@ class _RecipePageState extends State<RecipePage>
                                                           TextOverflow.ellipsis,
                                                     ),
                                                   ),
-                                                  const Icon(
-                                                    Icons.favorite,
-                                                    color: Color.fromARGB(
-                                                        255, 241, 147, 7),
-                                                    size: 24,
+                                                  // IconButton burada ekleniyor
+                                                  IconButton(
+                                                    icon: Icon(
+                                                      recipe['is_favorite'] ==
+                                                              true
+                                                          ? Icons.favorite
+                                                          : Icons
+                                                              .favorite_border,
+                                                      color:
+                                                          const Color.fromARGB(
+                                                              255, 241, 147, 7),
+                                                      size: 24,
+                                                    ),
+                                                    onPressed: () async {
+                                                      await toggleFavoriteStatus(
+                                                          recipeName,
+                                                          recipe['is_favorite'] ==
+                                                              true);
+                                                    },
                                                   ),
                                                 ],
                                               ),
+
                                               const SizedBox(height: 8),
                                               // Preparation time badge
                                               if (recipe['time_minutes'] !=
@@ -1061,42 +1115,69 @@ class _RecipePageState extends State<RecipePage>
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color.fromARGB(255, 241, 147, 7),
-        unselectedItemColor: Colors.grey,
-        currentIndex: _currentIndex,
-        onTap: (index) {
-          if (index != _currentIndex) {
-            setState(() {
-              _currentIndex = index;
-            });
+      bottomNavigationBar: _buildCurvedNavigationBar(),
+    );
+  }
 
-            // Navigate to the appropriate page based on the selected index
-            if (index == 0) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const HomePage()),
-              );
-            } else if (index == 2) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsPage()),
-              );
-            }
-            // For index 1 (recipes), we're already on the RecipePage so no navigation needed
-          }
-        },
-        items: List.generate(
-          _icons.length,
-          (index) => BottomNavigationBarItem(
-            icon: Icon(_icons[index]),
-            label: index == 0
-                ? 'Home'
-                : index == 1
-                    ? 'Recipes'
-                    : 'Settings',
+  Widget _buildCurvedNavigationBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 10,
+            offset: Offset(0, -2),
           ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: List.generate(_icons.length, (index) {
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  _currentIndex = index;
+                });
+                if (index == 0) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) =>
+                            const HomePage()), // HomePage'e yönlendir
+                  );
+                } else if (index == 1) {
+                  // widget.pickImage fonksiyonunu çağırıyoruz
+                  widget.pickImage(); // pickImage'ı burada çağırıyoruz
+                } else if (index == 2) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const SettingsPage()),
+                  );
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOut,
+                width: _currentIndex == index ? 60 : 50,
+                height: _currentIndex == index ? 60 : 50,
+                decoration: BoxDecoration(
+                  color: _currentIndex == index
+                      ? const Color.fromARGB(255, 255, 230, 149)
+                      : Colors.grey[300],
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  _icons[index],
+                  size: _currentIndex == index ? 30 : 24,
+                  color: _currentIndex == index ? Colors.white : Colors.black54,
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );

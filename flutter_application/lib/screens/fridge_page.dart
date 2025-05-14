@@ -635,7 +635,7 @@ class FridgePageState extends State<FridgePage> {
                                               BorderRadius.circular(12),
                                         ),
                                         child: Text(
-                                          'Süresi doldu!',
+                                          'Expired!',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
