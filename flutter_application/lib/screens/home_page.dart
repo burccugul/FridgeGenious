@@ -261,7 +261,8 @@ class HomePageState extends State<HomePage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (context) => const RecipePage()),
+                                    builder: (context) =>
+                                        RecipePage(pickImage: pickImage)),
                               );
                             },
                           ),
@@ -275,8 +276,9 @@ class HomePageState extends State<HomePage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (context) =>
-                                        const ShoppingListPage()),
+                                    builder: (context) => ShoppingListPage(
+                                          pickImage: pickImage,
+                                        )),
                               );
                             },
                           ),

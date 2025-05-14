@@ -16,7 +16,7 @@ class RecipeDetailPage extends StatefulWidget {
 class _RecipeDetailPageState extends State<RecipeDetailPage> {
   int servings = 1;
   bool isIngredientsExpanded = false;
-  bool isDirectionsExpanded = true;
+  bool isDirectionsExpanded = false;
   bool isFavorite = false;
   bool isUpdating = false;
   bool isLoadingImage = true;
@@ -1094,13 +1094,37 @@ class _RecipeDetailPageState extends State<RecipeDetailPage> {
               .split('\n')
               .where((step) => step.trim().isNotEmpty)
               .toList();
-        } else {
-          directions = stepsText
-              .split('.')
-              .where((step) => step.trim().isNotEmpty)
-              .map((step) => '${step.trim()}.')
-              .toList();
         }
+        if (recipe['steps'] != null) {
+          if (recipe['steps'] is List) {
+            for (var step in recipe['steps']) {
+              if (step is String) {
+                directions.add(step);
+              } else if (step is Map && step['instruction'] != null) {
+                directions.add(step['instruction'].toString());
+              }
+            }
+          } else if (recipe['steps'] is String) {
+            String stepsText = recipe['steps'];
+            if (stepsText.contains('\n')) {
+              directions = stepsText
+                  .split('\n')
+                  .where((step) => step.trim().isNotEmpty)
+                  .toList();
+            } else {
+              directions = stepsText
+                  .split('.')
+                  .where((step) => step.trim().isNotEmpty)
+                  .map((step) => '${step.trim()}.')
+                  .toList();
+            }
+          }
+        }
+
+// ✨ Noktalama işaretlerini temizle
+        directions = directions
+            .map((step) => step.replaceAll(RegExp(r'[^\w\s]'), '').trim())
+            .toList();
       }
     }
 

@@ -159,6 +159,9 @@ Respond ONLY in JSON format, like this:
       final recipeName = recipeJson['recipe_name'] ?? "Unnamed Recipe";
       final List<dynamic> ingredients =
           recipeJson['ingredients'] is List ? recipeJson['ingredients'] : [];
+      final List<dynamic> steps = recipeJson['steps'] is List
+          ? recipeJson['steps']
+          : []; // Steps verilerini aldık
       final int time =
           recipeJson['time_minutes'] is int ? recipeJson['time_minutes'] : 0;
 
@@ -176,6 +179,7 @@ Respond ONLY in JSON format, like this:
           "time": time,
           "quantity": 1,
           "is_favorite": false,
+          "steps": steps, // Steps verilerini ekliyoruz
         };
 
         try {
