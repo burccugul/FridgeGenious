@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_application/services/family_package_service.dart';
 import 'package:flutter_application/services/auth_service.dart';
 import 'package:flutter_application/services/user_service.dart';
 import 'package:flutter_application/services/notification_service.dart';
@@ -8,16 +7,16 @@ import 'package:flutter_application/services/data_export_service.dart';
 import 'package:flutter_application/services/theme_service.dart';
 import 'package:flutter_application/models/user_model.dart';
 import 'package:provider/provider.dart'; // Bu satırı ekle
-import 'package:flutter_application/main.dart'; 
 import 'package:flutter_application/database/supabase_helper.dart';
 import 'package:flutter_application/providers/theme_notifier.dart';
 import 'package:http/http.dart' as http; // ← http POST için
 import 'dart:convert'; // ← jsonEncode için
-import 'package:flutter_application/main.dart' show ThemeNotifier, TextSizeNotifier;
+import 'package:flutter_application/main.dart'
+    show ThemeNotifier, TextSizeNotifier;
+import 'package:flutter_application/services/family_package_service.dart'; // FamilyPackagePage için
+
 // ThemeNotifier ve TextSizeNotifier burada tanımlı
 // Adjust this import path based on your project structure
-//import 'package:flutter_application/pages/family_package_page.dart'; // Import for FamilyPackagePage
-import 'package:flutter_application/services/family_package_service.dart';
 // Enum for text sizes
 enum TextSize { small, medium, large }
 
@@ -85,22 +84,24 @@ class SettingsPageState extends State<SettingsPage> {
         isDarkMode = prefs.getBool('isDarkMode') ?? false;
         selectedLanguage = prefs.getString('language') ?? 'English';
         selectedTextSize = TextSize.values[prefs.getInt('textSize') ?? 1];
-        expiringItemsNotification = prefs.getBool('expiringItemsNotification') ?? true;
+        expiringItemsNotification =
+            prefs.getBool('expiringItemsNotification') ?? true;
         recipeNotification = prefs.getBool('recipeNotification') ?? true;
         lowStockNotification = prefs.getBool('lowStockNotification') ?? false;
         syncMode = prefs.getString('syncMode') ?? 'Manual';
       });
 
       // Apply theme (şimdilik sadece state'i güncelliyoruz, tema ana widget'ta uygulanacak)
-      Provider.of<ThemeNotifier>(context, listen: false).setThemeMode(isDarkMode);
+      Provider.of<ThemeNotifier>(context, listen: false)
+          .setThemeMode(isDarkMode);
 
       // Apply text size (şimdilik sadece state'i güncelliyoruz)
       final textSizeString = selectedTextSize.name;
-      Provider.of<TextSizeNotifier>(context, listen: false).setTextSize(textSizeString);
+      Provider.of<TextSizeNotifier>(context, listen: false)
+          .setTextSize(textSizeString);
 
       // Apply notification settings
       await _updateNotificationSettings();
-
     } catch (e) {
       _showErrorSnackBar('Failed to load settings: ${e.toString()}');
     }
@@ -114,7 +115,8 @@ class SettingsPageState extends State<SettingsPage> {
       await prefs.setBool('isDarkMode', isDarkMode);
       await prefs.setString('language', selectedLanguage);
       await prefs.setInt('textSize', selectedTextSize.index);
-      await prefs.setBool('expiringItemsNotification', expiringItemsNotification);
+      await prefs.setBool(
+          'expiringItemsNotification', expiringItemsNotification);
       await prefs.setBool('recipeNotification', recipeNotification);
       await prefs.setBool('lowStockNotification', lowStockNotification);
       await prefs.setString('syncMode', syncMode);
@@ -128,11 +130,13 @@ class SettingsPageState extends State<SettingsPage> {
   // Update notification settings
   Future<void> _updateNotificationSettings() async {
     try {
-      await _notificationService.setExpiringItemsNotification(expiringItemsNotification);
+      await _notificationService
+          .setExpiringItemsNotification(expiringItemsNotification);
       await _notificationService.setRecipeNotification(recipeNotification);
       await _notificationService.setLowStockNotification(lowStockNotification);
     } catch (e) {
-      _showErrorSnackBar('Failed to update notification settings: ${e.toString()}');
+      _showErrorSnackBar(
+          'Failed to update notification settings: ${e.toString()}');
     }
   }
 
@@ -148,9 +152,11 @@ class SettingsPageState extends State<SettingsPage> {
   }
 
   // Change user password
-  Future<void> _changePassword(String newPassword) async { // Sadece yeni şifreyi alıyor
+  Future<void> _changePassword(String newPassword) async {
+    // Sadece yeni şifreyi alıyor
     try {
-      await _authService.changePassword(newPassword); // Sadece yeni şifreyi gönderiyor
+      await _authService
+          .changePassword(newPassword); // Sadece yeni şifreyi gönderiyor
       _showSuccessSnackBar('Password changed successfully');
     } catch (e) {
       _showErrorSnackBar('Failed to change password: ${e.toString()}');
@@ -188,45 +194,56 @@ class SettingsPageState extends State<SettingsPage> {
     }
   }
 
- Future<void> _deleteAccount() async {
-  try {
-    final supabase = SupabaseHelper();
-    await supabase.initialize();
+  Future<void> _deleteAccount() async {
+    try {
+      final supabase = SupabaseHelper();
+      await supabase.initialize();
 
-    final userId = await supabase.getCurrentUserId();
-    if (userId == null) throw Exception("User ID not found");
+      final userId = await supabase.getCurrentUserId();
+      if (userId == null) throw Exception("User ID not found");
 
-    // 1. Uygulamadan çıkış yap
-    await supabase.client.auth.signOut();
+      // 1. Uygulamadan çıkış yap
+      await supabase.client.auth.signOut();
 
-    // 2. Kullanıcıya ait diğer tabloları temizle
-    await supabase.client.from('inventory').delete().eq('uuid_userid', userId);
-    await supabase.client.from('shoppinglist').delete().eq('uuid_userid', userId);
-    await supabase.client.from('recipes').delete().eq('uuid_userid', userId);
-    await supabase.client.from('family_packages').delete().eq('owner_user_id', userId);
+      // 2. Kullanıcıya ait diğer tabloları temizle
+      await supabase.client
+          .from('inventory')
+          .delete()
+          .eq('uuid_userid', userId);
+      await supabase.client
+          .from('shoppinglist')
+          .delete()
+          .eq('uuid_userid', userId);
+      await supabase.client.from('recipes').delete().eq('uuid_userid', userId);
+      await supabase.client
+          .from('family_packages')
+          .delete()
+          .eq('owner_user_id', userId);
 
-    // 3. Flask API ile auth.users'dan sil
-    final response = await http.post(
-      Uri.parse('http://127.0.0.1:5000/delete_user'),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"user_id": userId}),
-    );
+      // 3. Flask API ile auth.users'dan sil
+      final response = await http.post(
+        Uri.parse('http://127.0.0.1:5000/delete_user'),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"user_id": userId}),
+      );
 
-    if (response.statusCode == 200) {
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+      if (response.statusCode == 200) {
+        if (mounted) {
+          Navigator.of(context)
+              .pushNamedAndRemoveUntil('/login', (route) => false);
+        }
+      } else {
+        throw Exception("Backend delete failed: ${response.body}");
       }
-    } else {
-      throw Exception("Backend delete failed: ${response.body}");
+    } catch (e) {
+      _showErrorSnackBar('Failed to delete account: ${e.toString()}');
     }
-
-  } catch (e) {
-    _showErrorSnackBar('Failed to delete account: ${e.toString()}');
   }
-}
+
   // Show name edit dialog
   void _showNameEditDialog() {
-    final TextEditingController nameController = TextEditingController(text: _currentUser?.name ?? '');
+    final TextEditingController nameController =
+        TextEditingController(text: _currentUser?.name ?? '');
 
     showDialog(
       context: context,
@@ -271,9 +288,11 @@ class SettingsPageState extends State<SettingsPage> {
 
   // Show password change dialog
   void _showPasswordChangeDialog() {
-    final TextEditingController currentPasswordController = TextEditingController();
+    final TextEditingController currentPasswordController =
+        TextEditingController();
     final TextEditingController newPasswordController = TextEditingController();
-    final TextEditingController confirmPasswordController = TextEditingController();
+    final TextEditingController confirmPasswordController =
+        TextEditingController();
 
     showDialog(
       context: context,
@@ -329,11 +348,13 @@ class SettingsPageState extends State<SettingsPage> {
                   _showErrorSnackBar('Password cannot be empty');
                   return;
                 }
-                if (newPasswordController.text != confirmPasswordController.text) {
+                if (newPasswordController.text !=
+                    confirmPasswordController.text) {
                   _showErrorSnackBar('Passwords do not match');
                   return;
                 }
-                _changePassword( // Mevcut şifre argümanı kaldırıldı
+                _changePassword(
+                  // Mevcut şifre argümanı kaldırıldı
                   newPasswordController.text,
                 );
               },
@@ -368,9 +389,7 @@ class SettingsPageState extends State<SettingsPage> {
     );
   }
 
-
-
-@override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
@@ -584,57 +603,58 @@ class SettingsPageState extends State<SettingsPage> {
                         ],
                         onChanged: (String? value) async {
                           if (value != null) {
-                              setState(() {
-                                syncMode = value;
-                              });
-                              await _saveSettings();
-                            }
-                          },
-                        ),
-                      ),
-                      ListTile(
-                        title: const Text(
-                          'Export Data',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        onTap: _exportData,
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                      ),
-                      ListTile(
-                        title: const Text(
-                          'Clear Local Data',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        onTap: () {
-                          _showClearDataDialog();
+                            setState(() {
+                              syncMode = value;
+                            });
+                            await _saveSettings();
+                          }
                         },
-                        trailing: const Icon(Icons.arrow_forward_ios),
                       ),
-                    ],
-                  ),
+                    ),
+                    ListTile(
+                      title: const Text(
+                        'Export Data',
+                        style: TextStyle(color: Colors.black),
+                      ),
+                      onTap: _exportData,
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                    ),
+                    ListTile(
+                      title: const Text(
+                        'Clear Local Data',
+                        style: TextStyle(color: Colors.black),
+                      ),
+                      onTap: () {
+                        _showClearDataDialog();
+                      },
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                    ),
+                  ],
+                ),
 
-                  // Theme & Display Section
-                  _buildSection(
-                    'Theme & Display',
-                    [
-                      SwitchListTile(
-                        title: const Text(
-                          'Dark Mode',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        value: isDarkMode,
-                        onChanged: (bool value) async {
-                          setState(() {
-                            isDarkMode = value;
-                          });
-                          // Tema değişikliğini ThemeNotifier'a bildiriyoruz
-                          Provider.of<ThemeNotifier>(context, listen: false).setThemeMode(value);
-                          await _saveSettings();
-                        },
+                // Theme & Display Section
+                _buildSection(
+                  'Theme & Display',
+                  [
+                    SwitchListTile(
+                      title: const Text(
+                        'Dark Mode',
+                        style: TextStyle(color: Colors.black),
                       ),
-                      // If SegmentedButton causes errors, uncomment this alternative implementation
-                      // and comment out the ListTile below that uses SegmentedButton
-                      /*
+                      value: isDarkMode,
+                      onChanged: (bool value) async {
+                        setState(() {
+                          isDarkMode = value;
+                        });
+                        // Tema değişikliğini ThemeNotifier'a bildiriyoruz
+                        Provider.of<ThemeNotifier>(context, listen: false)
+                            .setThemeMode(value);
+                        await _saveSettings();
+                      },
+                    ),
+                    // If SegmentedButton causes errors, uncomment this alternative implementation
+                    // and comment out the ListTile below that uses SegmentedButton
+                    /*
                       ListTile(
                         title: const Text(
                           'Text Size',
@@ -695,131 +715,133 @@ class SettingsPageState extends State<SettingsPage> {
                         ),
                       ),
                       */
-                      // Use this if you have Flutter 3.0+ with SegmentedButton support
-                      ListTile(
-                        title: const Text(
-                          'Text Size',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        trailing: SegmentedButton<TextSize>(
-                          segments: const [
-                            ButtonSegment(
-                              value: TextSize.small,
-                              label: Text(
-                                'S',
-                                style: TextStyle(color: Colors.black),
-                              ),
-                            ),
-                            ButtonSegment(
-                              value: TextSize.medium,
-                              label: Text(
-                                'M',
-                                style: TextStyle(color: Colors.black),
-                              ),
-                            ),
-                            ButtonSegment(
-                              value: TextSize.large,
-                              label: Text(
-                                'L',
-                                style: TextStyle(color: Colors.black),
-                              ),
-                            ),
-                          ],
-                          selected: {selectedTextSize},
-                          onSelectionChanged: (Set<TextSize> selection) async {
-                            setState(() {
-                              selectedTextSize = selection.first;
-                            });
-                            final textSizeString = selectedTextSize.name;
-                            // Metin boyutu değişikliğini TextSizeNotifier'a bildiriyoruz
-                            Provider.of<TextSizeNotifier>(context, listen: false).setTextSize(textSizeString);
-                            await _saveSettings();
-                          },
-                        ),
+                    // Use this if you have Flutter 3.0+ with SegmentedButton support
+                    ListTile(
+                      title: const Text(
+                        'Text Size',
+                        style: TextStyle(color: Colors.black),
                       ),
-                    ],
-                  ),
+                      trailing: SegmentedButton<TextSize>(
+                        segments: const [
+                          ButtonSegment(
+                            value: TextSize.small,
+                            label: Text(
+                              'S',
+                              style: TextStyle(color: Colors.black),
+                            ),
+                          ),
+                          ButtonSegment(
+                            value: TextSize.medium,
+                            label: Text(
+                              'M',
+                              style: TextStyle(color: Colors.black),
+                            ),
+                          ),
+                          ButtonSegment(
+                            value: TextSize.large,
+                            label: Text(
+                              'L',
+                              style: TextStyle(color: Colors.black),
+                            ),
+                          ),
+                        ],
+                        selected: {selectedTextSize},
+                        onSelectionChanged: (Set<TextSize> selection) async {
+                          setState(() {
+                            selectedTextSize = selection.first;
+                          });
+                          final textSizeString = selectedTextSize.name;
+                          // Metin boyutu değişikliğini TextSizeNotifier'a bildiriyoruz
+                          Provider.of<TextSizeNotifier>(context, listen: false)
+                              .setTextSize(textSizeString);
+                          await _saveSettings();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
 
-                  // Account Management Section
-                  _buildSection(
-                    'Account Management',
-                    [
-                      ListTile(
-                        title: const Text(
-                          'Create Family Package',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const FamilyPackagePage(),
-                            ),
-                          );
-                        },
-                        trailing: const Icon(Icons.group_add),
+                // Account Management Section
+                _buildSection(
+                  'Account Management',
+                  [
+                    ListTile(
+                      title: const Text(
+                        'Create Family Package',
+                        style: TextStyle(color: Colors.black),
                       ),
-                      ListTile(
-                        title: const Text(
-                          'Logout',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        onTap: () {
-                          _showLogoutDialog();
-                        },
-                        trailing: const Icon(Icons.logout),
+                      onTap: () {
+                        // Buraya ileride yeni bir sayfa açacağız
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const FamilyPackagePage(),
+                          ),
+                        );
+                      },
+                      trailing: const Icon(Icons.group_add),
+                    ),
+                    ListTile(
+                      title: const Text(
+                        'Logout',
+                        style: TextStyle(color: Colors.black),
                       ),
-                      ListTile(
-                        title: const Text(
-                          'Delete My Account',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        onTap: () {
-                          _showDeleteAccountDialog();
-                        },
-                        trailing: const Icon(Icons.delete_forever),
+                      onTap: () {
+                        _showLogoutDialog();
+                      },
+                      trailing: const Icon(Icons.logout),
+                    ),
+                    ListTile(
+                      title: const Text(
+                        'Delete My Account',
+                        style: TextStyle(color: Colors.black),
                       ),
-                    ],
-                  ),
+                      onTap: () {
+                        _showDeleteAccountDialog();
+                      },
+                      trailing: const Icon(Icons.delete_forever),
+                    ),
+                  ],
+                ),
 
-                  // About & Support Section
-                  _buildSection(
-                    'About & Support',
-                    [
-                      const ListTile(
-                        title: Text(
-                          'Version',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        trailing: Text(
-                          '1.0.0',
-                          style: TextStyle(color: Colors.black),
-                        ),
+                // About & Support Section
+                _buildSection(
+                  'About & Support',
+                  [
+                    const ListTile(
+                      title: Text(
+                        'Version',
+                        style: TextStyle(color: Colors.black),
                       ),
-                      ListTile(
-                        title: const Text(
-                          'Privacy Policy',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        onTap: () {
-                          Navigator.pushNamed(context, '/privacy-policy');
-                        },
-                        trailing: const Icon(Icons.arrow_forward_ios),
+                      trailing: Text(
+                        '1.0.0',
+                        style: TextStyle(color: Colors.black),
                       ),
-                      ListTile(
-                        title: const Text(
-                          'Contact Support',
-                          style: TextStyle(color: Colors.black),
-                        ),
-                        onTap: () {
-                          Navigator.pushNamed(context, '/contact-support');
-                        },
-                        trailing: const Icon(Icons.arrow_forward_ios),
+                    ),
+                    ListTile(
+                      title: const Text(
+                        'Privacy Policy',
+                        style: TextStyle(color: Colors.black),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                      onTap: () {
+                        Navigator.pushNamed(context, '/privacy-policy');
+                      },
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                    ),
+                    ListTile(
+                      title: const Text(
+                        'Contact Support',
+                        style: TextStyle(color: Colors.black),
+                      ),
+                      onTap: () {
+                        Navigator.pushNamed(context, '/contact-support');
+                      },
+                      trailing: const Icon(Icons.arrow_forward_ios),
+                    ),
+                  ],
+                ),
+              ],
+            ),
     );
   }
 
@@ -953,22 +975,6 @@ class SettingsPageState extends State<SettingsPage> {
           ],
         );
       },
-    );
-  }
-}
-
-class FamilyPackagePage extends StatelessWidget {
-  const FamilyPackagePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Family Package'),
-      ),
-      body: const Center(
-        child: Text('Family Package Creation Page Content'),
-      ),
     );
   }
 }
