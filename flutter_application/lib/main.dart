@@ -10,15 +10,15 @@ import 'screens/home_page.dart';
 import 'package:flutter_application/services/notification_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'dart:developer';
 
-// Global navigator key for navigation outside of the context tree
+// Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
-final _supabase = Supabase.instance.client;
+
+// Supabase client ve kullanıcı ID
+final _supabase = sb.Supabase.instance.client;
 String? effectiveUserID;
 
-// Get the effective user ID (personal or family owner)
 Future<void> getEffectiveUserID() async {
   try {
     final currentUserID = _supabase.auth.currentUser?.id;
@@ -58,16 +58,7 @@ void main() async {
 
   final notificationService = NotificationService();
   await notificationService.initialize();
-  // Günlük bildirim planla (örnek: saat 19:30)
-  // DENEME ÖNEMLİ SİLME
-  /*await notificationService.scheduleNotificationAtSpecificTime(
-    id: 100,
-    title: 'Akşam Hatırlatması',
-    body: 'Saat 19:30 oldu!',
-    hour: 19,
-    minute: 59,
-  );
-*/
+
   Logger.root.level = Level.ALL;
   Logger.root.onRecord.listen((record) {
     print('${record.level.name}: ${record.time}: ${record.message}');
@@ -78,28 +69,6 @@ void main() async {
     anonKey:
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6ZWxocXJhd2FldnZ1cWJwam5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNTc5NjMsImV4cCI6MjA2MDczMzk2M30.LzbdN2MZl-XIxyKQGhmaMCdUf-r41oOkSWCZfwTaSSE",
   );
-
-  // Set the effective user ID after Supabase initialization
-  await getEffectiveUserID();
-
-  final response = await Supabase.instance.client
-      .from('inventory')
-      .select()
-      .eq('uuid_userid', effectiveUserID); // kullanıcıya göre filtrele
-
-  final items = response as List;
-
-  for (var item in items) {
-    final String foodName = item['food_name'];
-    final DateTime expiryDate = DateTime.parse(item['expiration_date']);
-
-    await notificationService.sendExpirationReminderAtSpecificTime(
-      foodName: foodName,
-      expiryDate: expiryDate,
-      hour: 20,
-      minute: 30,
-    );
-  }
 
   runApp(
     app_provider.MultiProvider(
@@ -121,35 +90,52 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final sb.SupabaseClient supabase;
-  late Widget initialScreen;
+  late final NotificationService notificationService;
 
   @override
   void initState() {
     super.initState();
     supabase = sb.Supabase.instance.client;
-    initialScreen = supabase.auth.currentUser != null
-        ? const HomePage()
-        : const LoginPage();
+    notificationService = NotificationService();
 
     // Auth event listener
     sb.Supabase.instance.client.auth.onAuthStateChange.listen((data) async {
       final event = data.event;
       debugPrint("**** onAuthStateChange: $event");
 
-      // Update effectiveUserID when auth state changes
       if (event == sb.AuthChangeEvent.signedIn) {
         await getEffectiveUserID();
-      } else if (event == sb.AuthChangeEvent.signedOut) {
-        effectiveUserID = null;
-      }
 
-      // Use navigator key for navigation outside of build context
-      if (event == sb.AuthChangeEvent.signedOut) {
-        navigatorKey.currentState
-            ?.pushNamedAndRemoveUntil('/login', (route) => false);
-      } else if (event == sb.AuthChangeEvent.signedIn) {
+        // Kullanıcının envanter verisini çek ve bildirimleri planla
+        try {
+          final response = await supabase
+              .from('inventory')
+              .select()
+              .eq('uuid_userid', effectiveUserID);
+
+          final items = response as List;
+
+          for (var item in items) {
+            final String foodName = item['food_name'];
+            final DateTime expiryDate = DateTime.parse(item['expiration_date']);
+
+            await notificationService.sendExpirationReminderAtSpecificTime(
+              foodName: foodName,
+              expiryDate: expiryDate,
+              hour: 20,
+              minute: 30,
+            );
+          }
+        } catch (e) {
+          log("Error fetching inventory or scheduling notifications: $e");
+        }
+
         navigatorKey.currentState
             ?.pushNamedAndRemoveUntil('/home', (route) => false);
+      } else if (event == sb.AuthChangeEvent.signedOut) {
+        effectiveUserID = null;
+        navigatorKey.currentState
+            ?.pushNamedAndRemoveUntil('/login', (route) => false);
       }
     });
   }
@@ -161,18 +147,23 @@ class _MyAppState extends State<MyApp> {
         app_provider.Provider.of<TextSizeNotifier>(context);
 
     return MaterialApp(
-      navigatorKey: navigatorKey, // Add the navigator key here
+      navigatorKey: navigatorKey,
       title: 'Fridge Genius',
       theme: ThemeService().getLightTheme(textSizeNotifier.textSizeString),
       darkTheme: ThemeService().getDarkTheme(textSizeNotifier.textSizeString),
       themeMode: themeNotifier.themeMode,
       initialRoute: '/',
       routes: {
-        '/': (context) => OnboardingPage(), // başlangıç ekranı: login veya home
+        '/': (context) {
+          final currentUser = sb.Supabase.instance.client.auth.currentUser;
+          if (currentUser != null) {
+            return const HomePage();
+          } else {
+            return OnboardingPage();
+          }
+        },
         '/login': (context) => const LoginPage(),
         '/home': (context) => const HomePage(),
-
-        // Diğer route'ları da eklersin: '/settings': (context) => const SettingsPage(),
       },
     );
   }
