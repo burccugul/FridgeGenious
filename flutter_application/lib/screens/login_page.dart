@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application/screens/test.dart';
 import 'package:logger/logger.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -205,6 +206,18 @@ class LoginPageState extends State<LoginPage> {
             },
             child: const Text(
               'Forgot Password?',
+              style: TextStyle(color: Colors.black54, fontSize: 14),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const NotificationTestPage()));
+            },
+            child: const Text(
+              'test',
               style: TextStyle(color: Colors.black54, fontSize: 14),
             ),
           ),

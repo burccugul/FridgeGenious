@@ -48,7 +48,16 @@ dependencies:
   path_provider: ^2.1.5
   path: ^1.8.0
   supabase_flutter: ^1.10.13  # en güncel versiyonu pub.dev'den kontrol et
+  fixnum: ^1.1.0
+  flutter_launcher_icons: ^0.14.3
 
+
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  min_sdk_android: 21
 
 dev_dependencies:
   flutter_test:
