@@ -97,7 +97,7 @@ void main() async {
       foodName: foodName,
       expiryDate: expiryDate,
       hour: 20,
-      minute: 36,
+      minute: 30,
     );
   }
 
