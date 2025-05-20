@@ -455,6 +455,7 @@ class FridgePageState extends State<FridgePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("What's In Your Fridge"),
+        backgroundColor: Color.fromARGB(255, 241, 147, 7)
       ),
       body: Column(
         children: [
