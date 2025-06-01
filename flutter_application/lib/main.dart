@@ -7,6 +7,8 @@ import 'services/theme_service.dart';
 import 'providers/theme_notifier.dart';
 import 'screens/login_page.dart';
 import 'screens/home_page.dart';
+import 'screens/forgot_password_page.dart';  // FORGOT PASSWORD IMPORT
+// update_password_page.dart import'unu kaldırdık - artık gerekli değil
 import 'package:flutter_application/services/notification_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -164,6 +166,8 @@ class _MyAppState extends State<MyApp> {
         },
         '/login': (context) => const LoginPage(),
         '/home': (context) => const HomePage(),
+        '/forgot-password': (context) => const ForgotPasswordPage(),
+        // '/update-password' route'unu kaldırdık - artık gerekli değil
       },
     );
   }
