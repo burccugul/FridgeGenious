@@ -1,61 +1,429 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Email Verified | Fridge Genius</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background-color: #f4f6f8;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title id="pageTitle">Fridge Genius</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+        }
+        
+        /* Email Verified Styles */
+        .email-verified-container {
+            background-color: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .email-verified-card {
+            background-color: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        .email-verified-card h1 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+        .email-verified-card p {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
 
-    .card {
-      background-color: white;
-      padding: 40px;
-      border-radius: 10px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-      text-align: center;
-      max-width: 400px;
-      width: 90%;
-    }
+        /* Reset Password Styles */
+        .reset-password-container {
+            background: linear-gradient(135deg, #FFB74D 0%, #FF8A65 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .reset-password-card {
+            background-color: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .logo {
+            color: #FFB74D;
+            font-size: 28px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .reset-password-card h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+        .reset-password-card p {
+            color: #666;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 14px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+        .form-group input:focus {
+            border-color: #FFB74D;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(255, 183, 77, 0.1);
+        }
+        .btn {
+            display: inline-block;
+            padding: 14px 30px;
+            background: linear-gradient(135deg, #333 0%, #555 100%);
+            color: white;
+            text-decoration: none;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .message {
+            font-size: 14px;
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #d32f2f;
+            border: 1px solid #ffcdd2;
+        }
+        .success {
+            background-color: #e8f5e8;
+            color: #2e7d32;
+            border: 1px solid #c8e6c9;
+        }
+        .loading {
+            color: #666;
+            display: none;
+        }
+        .password-toggle {
+            position: relative;
+        }
+        .toggle-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #666;
+            font-size: 18px;
+        }
 
-    .card h1 {
-      color: #2e7d32;
-      margin-bottom: 10px;
-    }
+        /* Hide all sections by default */
+        .page-section {
+            display: none;
+        }
+        .page-section.active {
+            display: block;
+        }
 
-    .card p {
-      color: #333;
-      font-size: 16px;
-      margin-bottom: 30px;
-    }
-
-    .card a {
-      display: inline-block;
-      padding: 12px 20px;
-      background-color: #1976d2;
-      color: white;
-      text-decoration: none;
-      border-radius: 5px;
-      transition: background-color 0.3s ease;
-    }
-
-    .card a:hover {
-      background-color: #125ca1;
-    }
-  </style>
+        /* Default app redirect styles */
+        .app-redirect-container {
+            background-color: #f4f6f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .app-redirect-card {
+            background-color: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 90%;
+        }
+        .app-redirect-card h1 {
+            color: #FFB74D;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+        .app-redirect-card p {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+    </style>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <div class="card">
-    <h1>Email Verified ✅</h1>
-    <p>Your email has been successfully verified. You can now login the app!</p>
+    <!-- Email Verified Section -->
+    <div id="emailVerifiedSection" class="page-section">
+        <div class="email-verified-container">
+            <div class="email-verified-card">
+                <h1>Email Verified ✅</h1>
+                <p>Your email has been successfully verified. You can now login the app!</p>
+            </div>
+        </div>
+    </div>
 
-  </div>
+    <!-- Reset Password Section -->
+    <div id="resetPasswordSection" class="page-section">
+        <div class="reset-password-container">
+            <div class="reset-password-card">
+                <div class="logo">🧊 Fridge Genius</div>
+                <h1>Reset Your Password</h1>
+                <p>Enter your new password below to secure your account</p>
+                
+                <form id="resetForm">
+                    <div class="form-group">
+                        <label for="password">New Password</label>
+                        <div class="password-toggle">
+                            <input type="password" id="password" placeholder="Enter new password" required minlength="6">
+                            <button type="button" class="toggle-btn" onclick="togglePassword('password')">👁️</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <div class="password-toggle">
+                            <input type="password" id="confirmPassword" placeholder="Confirm new password" required minlength="6">
+                            <button type="button" class="toggle-btn" onclick="togglePassword('confirmPassword')">👁️</button>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="submitBtn">Update Password</button>
+                    
+                    <div id="loading" class="message loading">⏳ Updating your password...</div>
+                    <div id="error" class="message error" style="display: none;"></div>
+                    <div id="success" class="message success" style="display: none;"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Default App Redirect Section -->
+    <div id="appRedirectSection" class="page-section">
+        <div class="app-redirect-container">
+            <div class="app-redirect-card">
+                <h1>🧊 Fridge Genius</h1>
+                <p>Please download our mobile app from the App Store or Google Play to get started!</p>
+                <p style="color: #666; font-size: 14px;">This is a mobile-first application.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Supabase configuration
+        const supabaseUrl = 'https://pzelhqrawaevvuqbpjnc.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6ZWxocXJhd2FldnZ1cWJwam5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDUxNTc5NjMsImV4cCI6MjA2MDczMzk2M30.LzbdN2MZl-XIxyKQGhmaMCdUf-r41oOkSWCZfwTaSSE';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Get URL parameters from hash
+        const urlParams = new URLSearchParams(window.location.hash.substr(1));
+        const type = urlParams.get('type');
+        const accessToken = urlParams.get('access_token');
+        const refreshToken = urlParams.get('refresh_token');
+
+        console.log('URL Type:', type);
+        console.log('Access Token:', accessToken ? 'Present' : 'Not present');
+
+        // Determine which page to show
+        function showPage() {
+            const emailVerifiedSection = document.getElementById('emailVerifiedSection');
+            const resetPasswordSection = document.getElementById('resetPasswordSection');
+            const appRedirectSection = document.getElementById('appRedirectSection');
+
+            // Hide all sections first
+            emailVerifiedSection.classList.remove('active');
+            resetPasswordSection.classList.remove('active');
+            appRedirectSection.classList.remove('active');
+
+            if (type === 'signup') {
+                // Email verification
+                document.getElementById('pageTitle').textContent = 'Email Verified | Fridge Genius';
+                emailVerifiedSection.classList.add('active');
+                console.log('Showing email verification page');
+            } else if (type === 'recovery' && accessToken) {
+                // Password reset
+                document.getElementById('pageTitle').textContent = 'Reset Password | Fridge Genius';
+                resetPasswordSection.classList.add('active');
+                console.log('Showing password reset page');
+                initPasswordReset();
+            } else {
+                // Default redirect page
+                document.getElementById('pageTitle').textContent = 'Fridge Genius';
+                appRedirectSection.classList.add('active');
+                console.log('Showing app redirect page');
+            }
+        }
+
+        // Initialize password reset functionality
+        function initPasswordReset() {
+            // Set the session
+            if (accessToken && refreshToken) {
+                supabase.auth.setSession({
+                    access_token: accessToken,
+                    refresh_token: refreshToken
+                });
+            }
+
+            const form = document.getElementById('resetForm');
+            const passwordInput = document.getElementById('password');
+            const confirmPasswordInput = document.getElementById('confirmPassword');
+            const submitBtn = document.getElementById('submitBtn');
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const success = document.getElementById('success');
+
+            // Check if we have valid tokens
+            if (!accessToken || type !== 'recovery') {
+                showError('Invalid or expired reset link. Please request a new password reset from the app.');
+                submitBtn.disabled = true;
+                return;
+            }
+
+            // Form submission
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const password = passwordInput.value;
+                const confirmPassword = confirmPasswordInput.value;
+                
+                clearMessages();
+                
+                // Validation
+                if (password.length < 6) {
+                    showError('Password must be at least 6 characters long');
+                    return;
+                }
+                
+                if (password !== confirmPassword) {
+                    showError('Passwords do not match');
+                    return;
+                }
+                
+                // Show loading
+                submitBtn.disabled = true;
+                loading.style.display = 'block';
+                
+                try {
+                    const { error: updateError } = await supabase.auth.updateUser({
+                        password: password
+                    });
+                    
+                    if (updateError) {
+                        throw updateError;
+                    }
+                    
+                    showSuccess('✅ Password updated successfully! You can now close this window and login with your new password in the app.');
+                    form.style.display = 'none';
+                    
+                    // Auto close after 5 seconds
+                    setTimeout(() => {
+                        window.close();
+                    }, 5000);
+                    
+                } catch (err) {
+                    showError('❌ Error updating password: ' + err.message);
+                    submitBtn.disabled = false;
+                } finally {
+                    loading.style.display = 'none';
+                }
+            });
+
+            // Auto-focus first input
+            setTimeout(() => passwordInput.focus(), 100);
+        }
+
+        // Password toggle function
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const button = input.nextElementSibling;
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                button.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                button.textContent = '👁️';
+            }
+        }
+
+        // Message functions
+        function showError(message) {
+            const error = document.getElementById('error');
+            const success = document.getElementById('success');
+            error.textContent = message;
+            error.style.display = 'block';
+            success.style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            const error = document.getElementById('error');
+            const success = document.getElementById('success');
+            success.textContent = message;
+            success.style.display = 'block';
+            error.style.display = 'none';
+        }
+
+        function clearMessages() {
+            const error = document.getElementById('error');
+            const success = document.getElementById('success');
+            error.style.display = 'none';
+            success.style.display = 'none';
+        }
+
+        // Initialize page on load
+        window.addEventListener('load', showPage);
+    </script>
 </body>
 </html>
