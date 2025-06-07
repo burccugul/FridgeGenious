@@ -90,17 +90,26 @@ class SignUpPageState extends State<SignUpPage> {
           ),
         );
       }
-    } catch (error) {
-      _logger.severe('Unexpected error: $error');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('An error occurred: $error'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
+      } catch (error) {
+  _logger.severe('Unexpected error: $error');
+
+  String errorMessage = 'An unexpected error occurred. Please try again later.';
+
+  if (error is PostgrestException &&
+      error.code == '23505' &&
+      error.message.contains('duplicate key value')) {
+    errorMessage = 'This email address is already registered. Please log in or use a different email.';
+  }
+
+  if (mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(errorMessage),
+        backgroundColor: Colors.red,
+      ),
+    );
+  }
+} finally {
       if (mounted) {
         setState(() {
           _isLoading = false;

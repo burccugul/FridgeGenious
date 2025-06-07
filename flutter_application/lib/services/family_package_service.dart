@@ -587,6 +587,7 @@ class _FamilyPackagePageState extends State<FamilyPackagePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Family Package'),
+        backgroundColor: Color.fromARGB(255, 241, 147, 7),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
