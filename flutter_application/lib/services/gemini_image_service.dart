@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:flutter_application/database/supabase_helper.dart';
 import 'package:logging/logging.dart';
+import 'dart:async';
+
 
 final Logger _logger = Logger('GeminiService');
 
@@ -74,14 +76,20 @@ class GeminiService {
 
       _logger.info('Sending image to Gemini for analysis');
 
-      final responses = model.generateContentStream([
-        Content.multi([TextPart(prompt), imagePart])
-      ]);
+final responses = model.generateContentStream([
+  Content.multi([TextPart(prompt), imagePart])
+]);
 
-      String aiResponse = '';
-      await for (final response in responses) {
-        aiResponse += response.text ?? '';
-      }
+String aiResponse = '';
+try {
+  await responses.timeout(Duration(seconds: 10)).forEach((response) {
+    aiResponse += response.text ?? '';
+  });
+} on TimeoutException catch (_) {
+  _logger.severe("❌ Gemini model response timed out after 10 seconds");
+  return "Image analysis took too long. Please try again or enter the food items manually.";
+}
+
 
       if (aiResponse.isEmpty) {
         _logger.warning('No food items detected in the image');
