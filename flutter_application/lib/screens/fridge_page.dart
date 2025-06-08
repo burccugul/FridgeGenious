@@ -452,6 +452,7 @@ class FridgePageState extends State<FridgePage> {
 
   @override
   Widget build(BuildContext context) {
+    final visibleItems = inventoryItems.where((item) => item['quantity'] > 0).toList();
     return Scaffold(
       appBar: AppBar(
         title: const Text("What's In Your Fridge"),
@@ -503,9 +504,9 @@ class FridgePageState extends State<FridgePage> {
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,
                         ),
-                        itemCount: inventoryItems.length,
-                        itemBuilder: (context, index) {
-                          final ingredient = inventoryItems[index];
+                          itemCount: visibleItems.length,
+                          itemBuilder: (context, index) {
+                          final ingredient = visibleItems[index];
                           final expirationDate =
                               ingredient['expiration_date'] != null
                                   ? DateTime.tryParse(
